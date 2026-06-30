@@ -60,7 +60,7 @@ st_write(lsoa_london, "data/lsoa_london/lsoa_london.shp")
 ## 2. London Green Space Polygons
 
 ```{r}
-greenspace_gb <- st_read("data/OS-Open-Greenspace-GB/GB_GreenspaceSite/GB_GreenspaceSite.shp") %>%
+greenspace_gb <- st_read("data/raw_data/OS-Open-Greenspace-GB/GB_GreenspaceSite/GB_GreenspaceSite.shp") %>%
   st_transform(st_crs(london_boundary))
 ```
 
@@ -89,6 +89,10 @@ greenspace_london_2ha <- greenspace_london %>%
     area_ha = area_m2 / 10000
   ) %>%
   filter(area_ha >= 2)
+```
+
+```{r}
+qtm(greenspace_london_2ha)
 ```
 
 ```{r}
