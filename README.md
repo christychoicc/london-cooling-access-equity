@@ -13,7 +13,7 @@
 |Points|Lower layer Super Output Areas (December 2021) EW Population Weighted Centroids|LSOA population weighted centroids points|[View Link](https://geoportal.statistics.gov.uk/search?tags=population%2520weighted%2520centroid)|London LSOA centroids for origins for accessibility analysis|
 |Polygons/ Boundaries|Greater London Boundary|Greater London Boundary|[View Link](https://data.london.gov.uk/dataset/statistical-gis-boundary-files-for-london-20od9/)|Filter/ clip boundaries to London|
 |Polygons|Lower layer Super Output Areas (December 2021) EW |LSOA Boundaries|[View Link]()|Filtered for London LSOAs only|
-|Socioeconomic data|Indicies of Multiple Depriviation (IMD 2025)|LSOA-level deprivation indicies for England|[View Link for 2019](https://data.london.gov.uk/dataset/indices-of-deprivation-2l15g/); [View Link for 2025](https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025)|Socioeconomic vulnerability and compare accessibility to cool greenspace across more/ less deprived neighbourhoods|
+|Socioeconomic data|Indicies of Multiple Depriviation (IMD 2025)|LSOA-level deprivation indicies for England|[View Link](https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025)|Socioeconomic vulnerability and compare accessibility to cool greenspace across more/ less deprived neighbourhoods|
 |Socioeconomic data|Census Data||||
 
 ## Repository Structure
@@ -23,11 +23,11 @@ london-cooling-access-equity/
 ├── 2_GoogleEarthEngine                      # Google Earth Engine code script
 ├── 3_GoogleEarthEngine                      # Google Earth Engine code script
 ├── data/  
-|   ├── raw_data                             # Raw data downloads
-|   ├── greenspace_london                    # Greenspace polygons data filtered to London only (large file gitignored)
-|   ├── greenspace_london_2ha                # Greenspace polygons data filtered to >2ha and London only (large file gitignored)
-|   ├── lsoa_london                          # LSOA boundary data filtered to London only (large file gitignored)
-│   └── r5r                                  # Data folder for r5r
+|   ├── raw_data/                            # Raw data downloads
+|   ├── greenspace_london/                   # Greenspace polygons data filtered to London only (large file gitignored)
+|   ├── greenspace_london_2ha/               # Greenspace polygons data filtered to >2ha and London only (large file gitignored)
+|   ├── lsoa_london/                         # LSOA boundary data filtered to London only (large file gitignored)
+│   └── r5r/                                 # Data folder for r5r
 |       ├── greater-london-260414.osm.pbf    # Road network data
 |       ├── gtfs_rail.zip                    # Rail GTFS data
 |       └── itm_london_gtfs.zip              # Bus GTFS data
