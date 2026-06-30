@@ -16,7 +16,7 @@
 |Socioeconomic data|Indicies of Multiple Depriviation (IMD 2025)|LSOA-level deprivation indicies for England|[View Link](https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025)|Socioeconomic vulnerability and compare accessibility to cool greenspace across more/ less deprived neighbourhoods|
 |Socioeconomic data|Census Data||||
 
-## Repository Structure
+## Structure
 ```
 london-cooling-access-equity/
 ├── 1_Data_Filter_London.Rmd                 # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
@@ -24,10 +24,10 @@ london-cooling-access-equity/
 ├── 3_GoogleEarthEngine                      # Google Earth Engine code script
 ├── data/  
 |   ├── raw_data/                            # Raw data downloads
-|   ├── greenspace_london/                   # Greenspace polygons data filtered to London only (large file gitignored)
-|   ├── greenspace_london_2ha/               # Greenspace polygons data filtered to >2ha and London only (large file gitignored)
-|   ├── lsoa_london/                         # LSOA boundary data filtered to London only (large file gitignored)
-│   └── r5r/                                 # Data folder for r5r
+|   ├── greenspace_london/                   # Greenspace polygons shapefile filtered to London only (large file - gitignored)
+|   ├── greenspace_london_2ha/               # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
+|   ├── lsoa_london/                         # LSOA boundary shapefile filtered to London only (large file - gitignored)
+│   └── r5r/                                 # Data folder for r5r (large file - gitignored)
 |       ├── greater-london-260414.osm.pbf    # Road network data
 |       ├── gtfs_rail.zip                    # Rail GTFS data
 |       └── itm_london_gtfs.zip              # Bus GTFS data
