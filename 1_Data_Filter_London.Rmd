@@ -1,0 +1,96 @@
+---
+title: "1_Data_Filter_London"
+---
+
+This markdown file contans the code for filtering the downloaded raw data sets to the Greater London study area. These are pre-filtered for further data preprocessing in Google Earth Engine. The filtered data sets are saved as follows:
+
+1.  `lsoa_london` : LSOA boundaries filtered for London only
+2.  `greenspace_london` : green space polygons filtered for any intersecting the Greater London boundary
+3.  `greenspace_london_2ha` : green space polygons filtered for any intersecting the Greater London boundary, and sizes bigger than 2ha only (as informed by literature)
+
+## Load Packages
+
+```{r, message=FALSE, warning=FALSE}
+# Load packages
+library(sf)
+library(dplyr)
+library(tmap)
+```
+
+## 1. London LSOA Data 
+
+```{r}
+# LSOA for whole Great Britian
+lsoa_gb <- st_read("data/raw_data/Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BFC_V10/LSOA_2021_EW_BFC_V10.shp")
+
+# London Boundary 
+london_boundary <- st_read("data/raw_data/gla/London_GLA_Boundary.shp")
+
+# Ensure both have the same CRS
+london_boundary <- st_transform(london_boundary, st_crs(lsoa_gb))
+```
+
+```{r}
+# Centroids of LSOAs across GB
+lsoa_centroids <- st_centroid(lsoa_gb)
+```
+
+```{r}
+# Centroids within the London boundary
+lsoa_london <- lsoa_gb[st_within(lsoa_centroids, london_boundary, sparse = FALSE), ]
+```
+
+```{r}
+# Check number of LSOAs after clipped
+nrow(lsoa_london) 
+
+# Check geom type
+table(st_geometry_type(lsoa_london))
+```
+
+```{r}
+qtm(lsoa_london)
+```
+
+```{r}
+# Save as shapefile
+st_write(lsoa_london, "data/lsoa_london/lsoa_london.shp")
+```
+
+## 2. London Green Space Polygons
+
+```{r}
+greenspace_gb <- st_read("data/OS-Open-Greenspace-GB/GB_GreenspaceSite/GB_GreenspaceSite.shp") %>%
+  st_transform(st_crs(london_boundary))
+```
+
+```{r}
+# st_intersects to make sure the whole park is kept despite overspilling the London boundary
+greenspace_london <- greenspace_gb %>% 
+    st_filter(london_boundary, .predicate = st_intersects)
+```
+
+```{r}
+qtm(greenspace_london)
+```
+
+```{r}
+# Save as shapefile
+st_write(greenspace_london, "data/greenspace_london/greenspace_london.shp")
+```
+
+## 3. London Green Space Polygons \> 2ha 
+
+```{r}
+# Removed polygon sizes smaller than 2ha
+greenspace_london_2ha <- greenspace_london %>%
+  mutate(
+    area_m2 = as.numeric(st_area(.)),
+    area_ha = area_m2 / 10000
+  ) %>%
+  filter(area_ha >= 2)
+```
+
+```{r}
+st_write(greenspace_london_2ha, "data/greenspace_london_2ha/greenspace_london_2ha.shp")
+```
