@@ -1,0 +1,230 @@
+//------------------------------------------------------------------------
+//      Land Surface Temperature Export for London and London LSOAs 
+//                         and UHI Intensity
+//------------------------------------------------------------------------
+
+
+//----------------------- Set London coordinates -------------------------
+var london_point = ee.Geometry.Point([-0.1276, 51.5072]);
+
+Map.centerObject(london_point, 10)
+
+
+
+//------------------------- Load vector data -----------------------------
+
+// London GLA boundaries
+var london_gla_boundary = ee.FeatureCollection("users/christychoicc/London_GLA_Boundary");
+
+// London LSOA boundaries
+var lsoa_london_boundary_raw = ee.FeatureCollection("users/christychoicc/lsoa_london");
+
+
+
+
+// ----------------------- Clean LSOA geometry----------------------------
+
+// Define a cleaning function
+function cleanToPolygonOnly(feature) {
+  // Check geometry of each LSOA (Polygon/ MultiPolygon/ Geometry Collection...)
+  feature = ee.Feature(feature);
+  var geom = feature.geometry();
+  var geomType = geom.type();
+
+  var polygonCoords = ee.List(
+    // If is already a Polygon, keep and convert to MultiPolygon coordinate list
+    ee.Algorithms.If(
+      ee.Algorithms.IsEqual(geomType, 'Polygon'),
+      ee.List([geom.coordinates()]),
+      
+      // If is MultiPolygon, keep coordinates
+      ee.Algorithms.If(
+        ee.Algorithms.IsEqual(geomType, 'MultiPolygon'),
+        geom.coordinates(),
+
+        // If is GeometryCollection, keep only Polygon/ MultiPolygon
+        ee.List(geom.geometries()).iterate(function(part, acc) {
+          part = ee.Geometry(part);
+          acc = ee.List(acc);
+
+          var partType = part.type();
+
+          var coordsToAdd = ee.List(
+            // Keep Polygon
+            ee.Algorithms.If(
+              ee.Algorithms.IsEqual(partType, 'Polygon'),
+              ee.List([part.coordinates()]),
+              // Keep MultiPolygon
+              ee.Algorithms.If(
+                ee.Algorithms.IsEqual(partType, 'MultiPolygon'),
+                part.coordinates(),
+
+                // Drop any LineString, Point...
+                ee.List([])
+              )
+            )
+          );
+
+          return acc.cat(coordsToAdd);
+        }, ee.List([]))
+      )
+    )
+  );
+  // Create as a MultiPolygon with polygons only (no LineStrings)
+  var cleanGeom = ee.Geometry.MultiPolygon(polygonCoords, null, false);
+
+  return ee.Feature(cleanGeom)
+    .copyProperties(feature)
+    .set('clean_geom_type', cleanGeom.type())
+    .set('n_polygon_parts', polygonCoords.length());
+}
+
+// Apply the cleaning function to all LSOAs
+var lsoa_london_boundary = lsoa_london_boundary_raw
+  .map(cleanToPolygonOnly)
+  .filter(ee.Filter.gt('n_polygon_parts', 0));
+
+
+// Check after cleaning
+print('Original geometry types:');
+print(
+  lsoa_london_boundary_raw.map(function(feature) {
+    return feature.set('geom_type', feature.geometry().type());
+  }).aggregate_histogram('geom_type')
+);
+print('Cleaned geometry types:');
+print(
+  lsoa_london_boundary.map(function(feature) {
+    return feature.set('geom_type', feature.geometry().type());
+  }).aggregate_histogram('geom_type')
+);
+
+print('Original count:');
+print(lsoa_london_boundary_raw.size());
+print('Cleaned count:');
+print(lsoa_london_boundary.size());
+
+
+
+
+// ------------------- Cloud Masking & Scaling Functions ------------------
+// ------------------------- Landsat Scale Factors ------------------------
+function applyScaleFactors(image) {
+  var opticalBands = image.select('SR_B.').multiply(0.0000275).add(-0.2);
+  var thermalBands = image.select('ST_B.*').multiply(0.00341802).add(149.0);
+  return image.addBands(opticalBands, null, true)
+              .addBands(thermalBands, null, true);
+}
+
+// ------------------------ Cloud Masking Functions -----------------------
+var cloudMask = function(image) {
+  var dilatedCloud = (1 << 1)
+  var cirrus = (1 << 2);
+  var cloud = (1 << 3)
+  var cloudShadow = (1 << 4)
+  var qa = image.select('QA_PIXEL');
+  var mask = qa.bitwiseAnd(dilatedCloud).eq(0)
+    .and(qa.bitwiseAnd(cirrus).eq(0))
+    .and(qa.bitwiseAnd(cloud).eq(0))
+    .and(qa.bitwiseAnd(cloudShadow).eq(0));
+  return image.updateMask(mask);
+}
+
+
+
+// ------------------------ Load Landsat data ----------------------------
+// ---------------------------- Landsat 9 --------------------------------
+var L9data2025 = ee.ImageCollection('LANDSAT/LC09/C02/T1_L2')
+    .filterDate('2025-06-01', '2025-08-31')
+    // Filter to London only
+    .filterBounds(london_gla_boundary)
+    .map(cloudMask)
+    .map(applyScaleFactors);
+
+
+
+
+// ----------------------- Land Surface Temperature ----------------------
+
+// --------------------------- Landsat 9 LST -----------------------------
+var l9lst2025 = L9data2025.select('ST_B10').map(function (image) {
+  var subtract = image.subtract(273.15); // subtract
+  var mask = subtract.gt(0); //set mask up
+  var mask_0 = subtract.updateMask(mask); //Apply this in a mask
+  return mask_0;
+})  
+
+// Clip London GLA boundaries
+var l9lst2025_median_gla = l9lst2025.median().clip(london_gla_boundary);
+
+// Clip London LSOA boundaries
+var l9lst2025_median_lsoa = l9lst2025.median().clip(lsoa_london_boundary);
+
+
+
+
+
+// ---------------------------- Export data -------------------------------
+
+// ------------------ London Land Surface Temperature ---------------------
+
+// Export the image, specifying the CRS, transform, and region.
+Export.image.toDrive({
+  image: l9lst2025_median_gla,
+  description: 'London_LST_median',
+  crs: 'EPSG:27700',
+  // crsTransform: projection.transform,
+  region: london_gla_boundary.geometry(),
+  scale: 30,
+  fileFormat: 'GeoTIFF',
+  formatOptions: {cloudOptimized: true}
+});
+
+
+
+// ------------------------- Simple UHI intensity ---------------------------
+// -------- LSOA heat exposure and difference from London mean LST ----------
+// 1. Calculate mean LST for London 
+// 2. Calculate the LSOA mean LST  
+// 3. Calculate difference from London mean LST per LSOA 
+// 4. Export data
+
+// Calculate one mean LST value for London
+var london_mean_lst_dict = l9lst2025_median_gla.reduceRegion({
+  reducer: ee.Reducer.mean(),
+  geometry: london_gla_boundary.geometry(),
+  scale: 30,
+  crs: 'EPSG:27700'
+});
+
+var london_mean_lst = ee.Number(london_mean_lst_dict.get('ST_B10'));
+
+// Check calculated mean temperature
+print('London mean LST 2025:')
+print(london_mean_lst);
+
+// Calculate Statistics per spatial unit (mean LST for each LSOA)
+var mean_LST_LSOA = l9lst2025_median_lsoa.reduceRegions({
+  collection: lsoa_london_boundary,
+  reducer: ee.Reducer.mean(),
+  scale: 30,
+});
+
+// Add a new column for calculated difference from London mean LST for each LSOA
+var mean_LST_LSOA_with_difference = mean_LST_LSOA.map(function(feature) {
+  var lsoa_mean_lst = ee.Number(feature.get('mean'));
+  var lst_difference = lsoa_mean_lst.subtract(london_mean_lst);
+
+  return feature.set({
+    'london_mean_lst': london_mean_lst,
+    'lst_difference': lst_difference
+  });
+});
+
+
+// Export LSOA table as shapefile
+Export.table.toDrive({
+  collection: mean_LST_LSOA_with_difference,
+  description: 'London_LSOA_LST_UHI',
+  fileFormat: 'SHP'
+});
