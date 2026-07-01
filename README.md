@@ -28,7 +28,7 @@ london-cooling-access-equity/
 ## Data Availability
 Large data files exceeding GitHub's recommended file size limits (50 MB) are not included in this repository.
 
-The full project can be downloaded from the following: [Download Project Data](https://liveuclac-my.sharepoint.com/:f:/g/personal/ucfncc0_ucl_ac_uk/IgDHGUhBBPvyQJA3EktcxJIAAWQMLlG2khmJH0eewUCtqys?e=4hTciO)
+The full project data can be downloaded from the following: [Download Project Data](https://liveuclac-my.sharepoint.com/:f:/g/personal/ucfncc0_ucl_ac_uk/IgDHGUhBBPvyQJA3EktcxJIAAWQMLlG2khmJH0eewUCtqys?e=4hTciO)
 
 After downloading, place it in the project directory using the following structure:
 ```
