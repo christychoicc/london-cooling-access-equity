@@ -33,7 +33,7 @@ The required full project data can be downloaded here: [Download Project Data](h
 After downloading, place it in the project directory using the following structure:
 ```
 data/
-├── raw_data/                                # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
+├── raw_data/                                # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 
 ├── greenspace_london/                       # Greenspace polygons shapefile filtered to London only (large file - gitignored)
 ├── greenspace_london_2ha/                   # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
 ├── lsoa_london/                             # LSOA boundary shapefile filtered to London only (large file - gitignored)
