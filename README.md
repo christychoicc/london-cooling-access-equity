@@ -14,7 +14,7 @@
 |Socioeconomic data|Indicies of Multiple Depriviation (IMD 2025)|LSOA-level deprivation indicies for England|[View Link](https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025)|Socioeconomic vulnerability and compare accessibility to cool greenspace across more/ less deprived neighbourhoods|
 |Socioeconomic data|Census Data||||
 
-## Structure
+## Repository Structure
 ```
 london-cooling-access-equity/
 ├── 1_Data_Filter_London.Rmd                 # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
