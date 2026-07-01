@@ -55,15 +55,17 @@ data/raw_data/Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BFC_V10
 # LSOA population weighted centroids
 data/raw_data/LSOA_PopCentroids_EW_2021_V4_-7256415914866551835*
 # Greenspace access points and polygons
-data/raw_data/OS-Open-Greenspace-GB
+data/raw_data/OS-Open-Greenspace-GB*
 
 # pre-filtered files:
 # London LSOA
-data/lsoa_london
+data/lsoa_london*
 # Greenspace London
-data/greenspace_london
+data/greenspace_london*
 # Greenspace London > 2ha
-data/greenspace_london_2ha
+data/greenspace_london_2ha*
 
+# GEE files
+data/London_LSOA_LST_UHI*
 # r5r data: 
-data/r5r
+data/r5r*
