@@ -14,15 +14,20 @@
 |Socioeconomic data|Indicies of Multiple Depriviation (IMD 2025)|LSOA-level deprivation indicies for England|[View Link](https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025)|Socioeconomic vulnerability and compare accessibility to cool greenspace across more/ less deprived neighbourhoods|
 |Socioeconomic data|Census Data||||
 
+## Methodology
+
+
 ## Repository Structure
 ```
 london-cooling-access-equity/
-├── 1_Data_Filter_London.Rmd                 # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
-├── 2_GoogleEarthEngine_LST_UHI              # Google Earth Engine code script for London LST; London LSOAs LST; SUHII
-├── 3_GoogleEarthEngine_greenspace_LST_PCI   # Google Earth Engine code script
-├── data/  
-├── figures/
-|   ├── 
+├── 1_Data_Filter_London.Rmd                   # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
+├── 2_GoogleEarthEngine_LST_UHI                # Google Earth Engine code script for London LST; London LSOAs LST; SUHII
+├── 3_GoogleEarthEngine_greenspace_LST_PCI     # Google Earth Engine code script
+├── data/                                      # Folder containing all data files used for this study, available to download below under Data Availability
+├── figures/                                   # Figures presented in the dissertation document
+|   ├── Fig.1
+|   ├── Fig.2
+|   └── Fig.3
 ```
 
 ## Data Availability
@@ -33,16 +38,16 @@ The required full project data can be downloaded here: [Download Project Data](h
 After downloading, place it in the project directory using the following structure:
 ```
 data/
-├── raw_data/                                # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 
-├── greenspace_london/                       # Greenspace polygons shapefile filtered to London only (large file - gitignored)
-├── greenspace_london_2ha/                   # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
-├── lsoa_london/                             # LSOA boundary shapefile filtered to London only (large file - gitignored)
-├── London_LSOA_LST_UHI/                     # Google Earth Engine retreived LST and SUHII data (large file - gitignored)
-├── London_LST_median.tif                    # Google Earth Engine retrieved median LST raster data for Greater London
-└── r5r/                                     # Data folder for r5r (large file - gitignored)
-    ├── greater-london-260414.osm.pbf        # Road network data
-    ├── gtfs_rail.zip                        # Rail GTFS data
-    └── itm_london_gtfs.zip                  # Bus GTFS data
+├── raw_data/                                  # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 
+├── greenspace_london/                         # Greenspace polygons shapefile filtered to London only (large file - gitignored)
+├── greenspace_london_2ha/                     # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
+├── lsoa_london/                               # LSOA boundary shapefile filtered to London only (large file - gitignored)
+├── London_LSOA_LST_UHI/                       # Google Earth Engine retreived LST and SUHII data (large file - gitignored)
+├── London_LST_median.tif                      # Google Earth Engine retrieved median LST raster data for Greater London
+└── r5r/                                       # Data folder for r5r (large file - gitignored)
+    ├── greater-london-260414.osm.pbf          # Road network data
+    ├── gtfs_rail.zip                          # Rail GTFS data
+    └── itm_london_gtfs.zip                    # Bus GTFS data
 ```
 
 The analysis and preprocessing code scripts are to be stored locally under *the data/* directory
