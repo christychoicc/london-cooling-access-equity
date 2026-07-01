@@ -1,7 +1,5 @@
 # Assessing Equitable Multimodal Accessibility to Cooling Effective Urban Green Spaces: A Case Study of London
 
-
-
 ## Data Sources
 |Data Type|Name|Description|Source|Purpose|
 |---|---|---|---|---|
@@ -23,16 +21,28 @@ london-cooling-access-equity/
 ├── 2_GoogleEarthEngine_LST_UHI              # Google Earth Engine code script for London LST; London LSOAs LST; SUHII
 ├── 3_GoogleEarthEngine_greenspace_LST_PCI   # Google Earth Engine code script
 ├── data/  
-|   ├── raw_data/                            # Raw data downloads
-|   ├── greenspace_london/                   # Greenspace polygons shapefile filtered to London only (large file - gitignored)
-|   ├── greenspace_london_2ha/               # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
-|   ├── lsoa_london/                         # LSOA boundary shapefile filtered to London only (large file - gitignored)
-|   ├── London_LSOA_LST_UHI/                 # Google Earth Engine retreived LST and SUHII data (large file - gitignored)
-|   ├── London_LST_median.tif                # Google Earth Engine retrieved median LST raster data for Greater London
-│   └── r5r/                                 # Data folder for r5r (large file - gitignored)
-|       ├── greater-london-260414.osm.pbf    # Road network data
-|       ├── gtfs_rail.zip                    # Rail GTFS data
-|       └── itm_london_gtfs.zip              # Bus GTFS data
 ├── figures/
 |   ├── 
 ```
+
+# Data Availability
+Large data files exceeding GitHub's recommended file size limits (50 MB) are not included in this repository.
+
+The full project can be downloaded from the following: [Download Project Data](https://liveuclac-my.sharepoint.com/:f:/g/personal/ucfncc0_ucl_ac_uk/IgDHGUhBBPvyQJA3EktcxJIAAWQMLlG2khmJH0eewUCtqys?e=4hTciO)
+
+After downloading, place it in the project directory using the following structure:
+```
+data/
+├── raw_data/                                # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
+├── greenspace_london/                       # Greenspace polygons shapefile filtered to London only (large file - gitignored)
+├── greenspace_london_2ha/                   # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
+├── lsoa_london/                             # LSOA boundary shapefile filtered to London only (large file - gitignored)
+├── London_LSOA_LST_UHI/                     # Google Earth Engine retreived LST and SUHII data (large file - gitignored)
+├── London_LST_median.tif                    # Google Earth Engine retrieved median LST raster data for Greater London
+└── r5r/                                     # Data folder for r5r (large file - gitignored)
+    ├── greater-london-260414.osm.pbf        # Road network data
+    ├── gtfs_rail.zip                        # Rail GTFS data
+    └── itm_london_gtfs.zip                  # Bus GTFS data
+```
+
+The analysis and preprocessing code scripts are to be stored locally under *the data/* directory
