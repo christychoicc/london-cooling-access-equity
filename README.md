@@ -1,4 +1,4 @@
-# Assessing Multimodal Accessibility to Cooling Effective Urban Green Spaces: A Case Study of London
+# Assessing Equitable Multimodal Accessibility to Cooling Effective Urban Green Spaces: A Case Study of London
 
 
 
@@ -27,6 +27,8 @@ london-cooling-access-equity/
 |   ├── greenspace_london/                   # Greenspace polygons shapefile filtered to London only (large file - gitignored)
 |   ├── greenspace_london_2ha/               # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
 |   ├── lsoa_london/                         # LSOA boundary shapefile filtered to London only (large file - gitignored)
+|   ├── London_LSOA_LST_UHI/                 # Google Earth Engine retreived LST and SUHII data (large file - gitignored)
+|   ├── London_LST_median.tif                # Google Earth Engine retrieved median LST raster data for Greater London
 │   └── r5r/                                 # Data folder for r5r (large file - gitignored)
 |       ├── greater-london-260414.osm.pbf    # Road network data
 |       ├── gtfs_rail.zip                    # Rail GTFS data
