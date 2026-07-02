@@ -2,3 +2,199 @@
 title: "4_Cooling_Effective_UGS_Accessibility"
 ---
 
+This markdown file contains the code for ......
+
+```{r}
+# remove objects from workspace and clear memory
+rm(list = ls())    
+gc()
+```
+
+## Load Packages
+
+```{r, message=FALSE, warning=FALSE}
+library(sf)
+library(dplyr)
+```
+
+## 1. Park Cooling Quantification
+
+### 1.1. Data Loading and Preparation
+
+```{r}
+# load greenspace buffer lst shapefile from GEE export
+greenspace <- st_read("data/greenspace_buffer_lst/greenspace_buffer_lst.shp")
+```
+
+```{r}
+# check column names
+greenspace %>% colnames()
+```
+
+```{r}
+# selected needed columns
+greenspace_clean <- greenspace %>% 
+  select(id, function_, area_ha, park_lst,
+         # all of the 20 buffer rings in ascending order
+         all_of(paste0("ring_", seq(30, 600, 30))),
+         geometry)
+```
+
+```{r}
+# check any NA values
+greenspace_clean %>%
+  st_drop_geometry() %>%
+  summarise(across(everything(), ~sum(is.na(.)))) %>%
+  t()
+```
+
+### 1.2. Cubic Polynomial Fitting Model and Park Cooling Intensity (PCI)
+
+| Name                         | Formula                         |
+|------------------------------|---------------------------------|
+| Cublic Polynomial Fitting    | **T(x) = ax³ + bx² + cx + d**   |
+| Park Cooling Intensity (PCI) | **PCI = L × T_L − ∫₀ᴸ T(x) dx** |
+
+```{r}
+# Ring distances in metres — x values for polynomial fitting
+x_vals <- seq(30, 600, 30)
+ring_cols <- paste0("ring_", seq(30, 600, 30))
+
+results <- list()
+
+# loop through each greenspace
+for (i in 1:nrow(greenspace_clean)) {
+  # for each greenspace
+  park <- greenspace_clean[i, ]
+  # take LST values for each ring
+  y_vals <- as.numeric(unlist(park[, ring_cols] %>% st_drop_geometry(), use.names = FALSE))
+  # take park LST values
+  park_lst <- park$park_lst
+  
+  # Cubic Polynomial Fitting:
+  # T(x) = ax3 + bx2 + cx + d
+  poly_fit <- lm(y_vals ~ poly(x_vals, degree = 3, raw = TRUE))
+  
+  # Coefficients
+  coefs <- coef(poly_fit)
+  a <- coefs[4]
+  b <- coefs[3]
+  c <- coefs[2]
+  d <- coefs[1]
+  
+  # R squared 
+  # less error with higher r2 (https://www.nature.com/articles/s41599-023-02209-5)
+  r2 <- summary(poly_fit)$r.squared
+  
+  # Find derivative T'(x) = 3ax2 + 2bx + c (for slope of temp distance curve)
+  # so when T'(x) = 0 --> that is a inflection point where temp stop decreasing/ increasing
+  disc <- (2*b)^2 - 4*(3*a)*c
+  # if no inflection point, return to NA values (no valid cooling limit)
+  if (is.na(disc) || disc < 0) {
+    d_max <- NA
+    T_L   <- NA
+    PCI   <- NA
+    dTmax <- NA
+  } else {
+    root1 <- (-(2*b) + sqrt(disc)) / (2 * 3*a)
+    root2 <- (-(2*b) - sqrt(disc)) / (2 * 3*a)
+    
+    valid_roots <- c(root1, root2)
+    # Keep only estimated turning points within your observed GEE ring range
+    valid_roots <- valid_roots[valid_roots >= 30 & valid_roots <= 600]
+    
+    if (length(valid_roots) == 0) {
+      d_max <- NA
+      T_L   <- NA
+      PCI   <- NA
+      dTmax <- NA
+    } else {
+      
+      # Check whether each turning point is a peak or a dip
+      # T''(x) = 6ax + 2b
+      second_derivative <- 6 * a * valid_roots + 2 * b
+      
+      # Keep only peaks
+      peak_roots <- valid_roots[second_derivative < 0]
+      
+      if (length(peak_roots) == 0) {
+        d_max <- NA
+        T_L   <- NA
+        PCI   <- NA
+        dTmax <- NA
+      } else {
+        
+        # Take the first peak aka the initial inflection point
+        d_max <- min(peak_roots)
+        
+        # Calculate fitted LST at d_max
+        T_L <- a * d_max^3 + b * d_max^2 + c * d_max + d
+        
+        # Integral of fitted T(x) from 0 to d_max
+        integral <- (a/4 * d_max^4) +
+          (b/3 * d_max^3) + 
+          (c/2 * d_max^2) + 
+          (d   * d_max)
+        
+        # PCI
+        PCI <- (d_max * T_L) - integral
+        
+        # Maximum temperature difference
+        dTmax <- T_L - park_lst
+      }
+    }
+  }
+  
+  # store results
+  results[[i]] <- data.frame(
+    id    = park$id,
+    r2    = round(r2, 3),
+    d_max = round(d_max, 1),
+    T_L   = round(T_L, 2),
+    dTmax = round(dTmax, 2),
+    PCI   = round(PCI, 1)
+  )
+}
+
+# combine results of all parks
+pci_results <- bind_rows(results)
+
+# check
+cat("Total parks processed:", nrow(pci_results), "\n")
+cat("Parks with valid PCI:", sum(!is.na(pci_results$PCI)), "\n")
+cat("Parks with no inflection point:", sum(is.na(pci_results$PCI)), "\n")
+
+summary(pci_results$PCI)
+summary(pci_results$r2)
+```
+
+```{r}
+# join calculated PCI back to greenspace_clean
+greenspace_pci <- greenspace_clean %>%
+  left_join(pci_results, by = "id")
+```
+
+### 1.3. Identify Cooling Effective UGS
+
+```{r}
+# identify cooling effective parks
+cooling_effective <- greenspace_pci %>%
+  filter(
+    !is.na(dTmax),
+    !is.na(PCI),
+    # filter temp difference > 0
+    dTmax > 0,
+    # filter accumulated cooling > 0
+    PCI > 0,
+    # 0.7 as a useful threshold(https://www.sciencedirect.com/science/article/pii/S0169743998002044) as it is said less error with higher r2 (https://www.nature.com/articles/s41599-023-02209-5)
+    r2 >= 0.7
+  )
+```
+
+Number of cooling effective UGS:
+
+```{r}
+nrow(cooling_effective)
+```
+
+## 2. Multimodal Rapid Realistic Routing (r5r)
