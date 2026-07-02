@@ -2,7 +2,7 @@
 title: "4_Cooling_Effective_UGS_Accessibility"
 ---
 
-This markdown file contains the code for ......
+This markdown file contains the full working code for ......
 
 ```{r}
 # remove objects from R environment and clear memory
@@ -15,6 +15,8 @@ gc()
 ```{r, message=FALSE, warning=FALSE}
 library(sf)
 library(dplyr)
+library(ggplot2)
+library(tidyr)
 ```
 
 ## 1. Park Cooling Quantification
@@ -36,7 +38,7 @@ greenspace %>% colnames()
 greenspace_clean <- greenspace %>% 
   select(id, function_, area_ha, park_lst,
          # all of the 20 buffer rings in ascending order
-         all_of(paste0("ring_", seq(30, 600, 30))),
+         all_of(paste0("ring_", seq(30, 900, 30))),
          geometry)
 ```
 
@@ -56,8 +58,8 @@ greenspace_clean %>%
 
 ```{r}
 # Ring distances in metres — x values for polynomial fitting
-x_vals <- seq(30, 600, 30)
-ring_cols <- paste0("ring_", seq(30, 600, 30))
+x_vals <- seq(30, 900, 30)
+ring_cols <- paste0("ring_", seq(30, 900, 30))
 
 # create an empty list to store results for later
 results <- list()
@@ -71,7 +73,7 @@ for (i in 1:nrow(greenspace_clean)) {
   # park LST values
   park_lst <- park$park_lst
   
-  # Cubic Polynomial Fitting - T(x) = ax3 + bx2 + cx + d
+  # fit a cubic polynomial curve: T(x) = ax3 + bx2 + cx + d
   poly_fit <- lm(y_vals ~ poly(x_vals, degree = 3, raw = TRUE))
   
   # coefficients
@@ -81,26 +83,28 @@ for (i in 1:nrow(greenspace_clean)) {
   c <- coefs[2]
   d <- coefs[1]
   
-  # R squared value
-  # less error with higher r2 (https://www.nature.com/articles/s41599-023-02209-5)
+  # calculate R squared 
+  # it is said there is found less error with higher r2 (https://www.nature.com/articles/s41599-023-02209-5)
   r2 <- summary(poly_fit)$r.squared
   
-  # Find derivative T'(x) = 3ax2 + 2bx + c 
-  # Find inflection/ turning points --> where temp stop decreasing/ increasing
+  # inflection/ turning point of curve --> find where temp stop decreasing/ increasing
+  # find derivative: T'(x) = 3ax2 + 2bx + c 
   disc <- (2*b)^2 - 4*(3*a)*c
-  # parks with no inflection point, return as NA
+  # parks with no valid inflection/ turning point, return as NA
   if (is.na(disc) || disc < 0) {
     d_max <- NA
     T_L   <- NA
     PCI   <- NA
     dTmax <- NA
   } else {
+   
+    # distances where temp stops increasing/ decreasing
     root1 <- (-(2*b) + sqrt(disc)) / (2 * 3*a)
     root2 <- (-(2*b) - sqrt(disc)) / (2 * 3*a)
     
-    # only keep estimated inflection points within ring range
+    # only keep inflection points within ring range 30 - 900m
     valid_roots <- c(root1, root2)
-    valid_roots <- valid_roots[valid_roots >= 30 & valid_roots <= 600]
+    valid_roots <- valid_roots[valid_roots >= 30 & valid_roots <= 900]
     
     if (length(valid_roots) == 0) {
       d_max <- NA
@@ -109,7 +113,7 @@ for (i in 1:nrow(greenspace_clean)) {
       dTmax <- NA
     } else {
       
-      # identify whether inflection point is a peak
+      # identify whether inflection point is at highest point of curve
       # T''(x) = 6ax + 2b
       second_derivative <- 6 * a * valid_roots + 2 * b
       
@@ -123,13 +127,14 @@ for (i in 1:nrow(greenspace_clean)) {
         dTmax <- NA
       } else {
         
-        # select cooling distance, the first peak aka the initial inflection point
+        # select the initial inflection point (first peak) as cooling distance
         d_max <- min(peak_roots)
         
-        # calculate fitted LST at d_max
+        # calculate fitted LST at the d_max
         T_L <- a * d_max^3 + b * d_max^2 + c * d_max + d
         
         # calculate integral of fitted T(x) from 0 to d_max
+        # aka summarise the temp pattern from park geom to the cooling distance
         integral <- (a/4 * d_max^4) +
           (b/3 * d_max^3) + 
           (c/2 * d_max^2) + 
@@ -146,12 +151,12 @@ for (i in 1:nrow(greenspace_clean)) {
   
   # store results
   results[[i]] <- data.frame(
-    id    = park$id,
-    r2    = round(r2, 3),
-    d_max = round(d_max, 1),
-    T_L   = round(T_L, 2),
-    dTmax = round(dTmax, 2),
-    PCI   = round(PCI, 1)
+    id    = park$id,           # park ID
+    r2    = round(r2, 3),      # R squared, how well the curve fits the data
+    d_max = round(d_max, 1),   # estimated cooling distance
+    T_L   = round(T_L, 2),     # temp at d_max
+    dTmax = round(dTmax, 2),   # difference between surrounding temp and park temp
+    PCI   = round(PCI, 1)      # park cooling intensity
   )
 }
 
@@ -159,7 +164,7 @@ for (i in 1:nrow(greenspace_clean)) {
 pci_results <- bind_rows(results)
 
 # check
-cat("Total parks processed:", nrow(pci_results), "\n")
+cat("Total parks:", nrow(pci_results), "\n")
 cat("Parks with valid PCI:", sum(!is.na(pci_results$PCI)), "\n")
 cat("Parks with no inflection point:", sum(is.na(pci_results$PCI)), "\n")
 
@@ -195,5 +200,25 @@ cooling_effective <- greenspace_pci %>%
 # check number of cooling effective UGS: 
 nrow(cooling_effective)
 ```
+
+```{r}
+ggplot(greenspace_pci) +
+  geom_sf(aes(fill = PCI), colour = NA) +
+  scale_fill_viridis_c(
+    name = "PCI",
+    na.value = "grey80"
+  ) +
+  labs(
+    title = "Park Cooling Intensity across Green Spaces"
+  ) +
+  theme_void() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+### 1.4. Limitations
+
+Did not remove pixels of water bodies, vegetation that potentially overlap with the buffer rings. Large imprevious surfaces as well.
 
 ## 2. Multimodal Rapid Realistic Routing (r5r)
