@@ -22,7 +22,7 @@
 london-cooling-access-equity/
 ├── 1_Data_Filter_London.Rmd                   # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
 ├── 2_GoogleEarthEngine_LST_UHI                # Google Earth Engine code script for London LST; London LSOAs LST; SUHII
-├── 3_GoogleEarthEngine_greenspace_LST_PCI     # Google Earth Engine code script
+├── 3_GoogleEarthEngine_greenspace_buffer_LST  # Google Earth Engine code script for LST of greenspaces > 2ha and its corresponding buffer rings from 0-600m 
 ├── data/                                      # Folder containing all data files used for this study, available to download below under Data Availability
 ├── figures/                                   # Figures presented in the dissertation document
 |   ├── Fig.1
