@@ -5,7 +5,7 @@ title: "4_Cooling_Effective_UGS_Accessibility"
 This markdown file contains the code for ......
 
 ```{r}
-# remove objects from workspace and clear memory
+# remove objects from R environment and clear memory
 rm(list = ls())    
 gc()
 ```
@@ -22,7 +22,7 @@ library(dplyr)
 ### 1.1. Data Loading and Preparation
 
 ```{r}
-# load greenspace buffer lst shapefile from GEE export
+# load greenspace buffer lst shapefile exported from GEE
 greenspace <- st_read("data/greenspace_buffer_lst/greenspace_buffer_lst.shp")
 ```
 
@@ -32,7 +32,7 @@ greenspace %>% colnames()
 ```
 
 ```{r}
-# selected needed columns
+# select needed columns only
 greenspace_clean <- greenspace %>% 
   select(id, function_, area_ha, park_lst,
          # all of the 20 buffer rings in ascending order
@@ -44,11 +44,10 @@ greenspace_clean <- greenspace %>%
 # check any NA values
 greenspace_clean %>%
   st_drop_geometry() %>%
-  summarise(across(everything(), ~sum(is.na(.)))) %>%
-  t()
+  summarise(across(everything(), ~sum(is.na(.))))
 ```
 
-### 1.2. Cubic Polynomial Fitting Model and Park Cooling Intensity (PCI)
+### 1.2. Cubic Polynomial Fitting and Park Cooling Intensity (PCI)
 
 | Name                         | Formula                         |
 |------------------------------|---------------------------------|
@@ -60,36 +59,36 @@ greenspace_clean %>%
 x_vals <- seq(30, 600, 30)
 ring_cols <- paste0("ring_", seq(30, 600, 30))
 
+# create an empty list to store results for later
 results <- list()
 
-# loop through each greenspace
+# for loop for each greenspace
 for (i in 1:nrow(greenspace_clean)) {
   # for each greenspace
   park <- greenspace_clean[i, ]
-  # take LST values for each ring
+  # LST values from buffer ring
   y_vals <- as.numeric(unlist(park[, ring_cols] %>% st_drop_geometry(), use.names = FALSE))
-  # take park LST values
+  # park LST values
   park_lst <- park$park_lst
   
-  # Cubic Polynomial Fitting:
-  # T(x) = ax3 + bx2 + cx + d
+  # Cubic Polynomial Fitting - T(x) = ax3 + bx2 + cx + d
   poly_fit <- lm(y_vals ~ poly(x_vals, degree = 3, raw = TRUE))
   
-  # Coefficients
+  # coefficients
   coefs <- coef(poly_fit)
   a <- coefs[4]
   b <- coefs[3]
   c <- coefs[2]
   d <- coefs[1]
   
-  # R squared 
+  # R squared value
   # less error with higher r2 (https://www.nature.com/articles/s41599-023-02209-5)
   r2 <- summary(poly_fit)$r.squared
   
-  # Find derivative T'(x) = 3ax2 + 2bx + c (for slope of temp distance curve)
-  # so when T'(x) = 0 --> that is a inflection point where temp stop decreasing/ increasing
+  # Find derivative T'(x) = 3ax2 + 2bx + c 
+  # Find inflection/ turning points --> where temp stop decreasing/ increasing
   disc <- (2*b)^2 - 4*(3*a)*c
-  # if no inflection point, return to NA values (no valid cooling limit)
+  # parks with no inflection point, return as NA
   if (is.na(disc) || disc < 0) {
     d_max <- NA
     T_L   <- NA
@@ -99,8 +98,8 @@ for (i in 1:nrow(greenspace_clean)) {
     root1 <- (-(2*b) + sqrt(disc)) / (2 * 3*a)
     root2 <- (-(2*b) - sqrt(disc)) / (2 * 3*a)
     
+    # only keep estimated inflection points within ring range
     valid_roots <- c(root1, root2)
-    # Keep only estimated turning points within your observed GEE ring range
     valid_roots <- valid_roots[valid_roots >= 30 & valid_roots <= 600]
     
     if (length(valid_roots) == 0) {
@@ -110,13 +109,13 @@ for (i in 1:nrow(greenspace_clean)) {
       dTmax <- NA
     } else {
       
-      # Check whether each turning point is a peak or a dip
+      # identify whether inflection point is a peak
       # T''(x) = 6ax + 2b
       second_derivative <- 6 * a * valid_roots + 2 * b
       
       # Keep only peaks
       peak_roots <- valid_roots[second_derivative < 0]
-      
+      # if it s not a peak, return as NA
       if (length(peak_roots) == 0) {
         d_max <- NA
         T_L   <- NA
@@ -124,22 +123,22 @@ for (i in 1:nrow(greenspace_clean)) {
         dTmax <- NA
       } else {
         
-        # Take the first peak aka the initial inflection point
+        # select cooling distance, the first peak aka the initial inflection point
         d_max <- min(peak_roots)
         
-        # Calculate fitted LST at d_max
+        # calculate fitted LST at d_max
         T_L <- a * d_max^3 + b * d_max^2 + c * d_max + d
         
-        # Integral of fitted T(x) from 0 to d_max
+        # calculate integral of fitted T(x) from 0 to d_max
         integral <- (a/4 * d_max^4) +
           (b/3 * d_max^3) + 
           (c/2 * d_max^2) + 
           (d   * d_max)
         
-        # PCI
+        # calculate PCI
         PCI <- (d_max * T_L) - integral
         
-        # Maximum temperature difference
+        # calculate max temperature difference
         dTmax <- T_L - park_lst
       }
     }
@@ -156,7 +155,7 @@ for (i in 1:nrow(greenspace_clean)) {
   )
 }
 
-# combine results of all parks
+# combine results
 pci_results <- bind_rows(results)
 
 # check
@@ -169,7 +168,7 @@ summary(pci_results$r2)
 ```
 
 ```{r}
-# join calculated PCI back to greenspace_clean
+# join PCI results back to greenspace_clean
 greenspace_pci <- greenspace_clean %>%
   left_join(pci_results, by = "id")
 ```
@@ -180,6 +179,7 @@ greenspace_pci <- greenspace_clean %>%
 # identify cooling effective parks
 cooling_effective <- greenspace_pci %>%
   filter(
+    # filter away all NA
     !is.na(dTmax),
     !is.na(PCI),
     # filter temp difference > 0
@@ -191,9 +191,8 @@ cooling_effective <- greenspace_pci %>%
   )
 ```
 
-Number of cooling effective UGS:
-
 ```{r}
+# check number of cooling effective UGS: 
 nrow(cooling_effective)
 ```
 
