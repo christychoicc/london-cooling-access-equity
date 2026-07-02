@@ -67,5 +67,7 @@ data/greenspace_london_2ha*
 
 # GEE files
 data/London_LSOA_LST_UHI*
+data/greenspace_buffer_LST*
+
 # r5r data: 
 data/r5r*
