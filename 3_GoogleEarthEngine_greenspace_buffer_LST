@@ -15,10 +15,6 @@ Map.centerObject(london_point, 10)
 // the greenspace shp is removed any park size < 2ha 
 var greenspace_raw = ee.FeatureCollection("users/christychoicc/greenspace_london_2ha");
 
-// Add map layer
-Map.addLayer(greenspace_raw, {}, 'Green spaces');
-
-
 
 // Check geometry types
 var greenspace_typed = greenspace_raw.map(function(feature) {
@@ -32,10 +28,13 @@ var greenspace = greenspace_typed.filter(
   ee.Filter.inList('geom_type', ['Polygon', 'MultiPolygon'])
 );
 
+// print to console number of green space polygons
 print('Number of polygon green spaces:')
 print(greenspace.size());
 
-Map.addLayer(greenspace, {}, 'Green spaces polygons only');
+// plot map layer of green space polygons 
+Map.addLayer(greenspace, {}, 'Green spaces polygons');
+
 
 
 // ------------------- Cloud Masking & Scaling Functions ------------------
@@ -46,6 +45,8 @@ function applyScaleFactors(image) {
   return image.addBands(opticalBands, null, true)
               .addBands(thermalBands, null, true);
 }
+
+
 
 // ------------------------ Cloud Masking Functions -----------------------
 var cloudMask = function(image) {
@@ -73,6 +74,7 @@ var L9data2025 = ee.ImageCollection('LANDSAT/LC09/C02/T1_L2')
     .map(applyScaleFactors);
 
 
+
 // ----------------------- Land Surface Temperature ----------------------
 
 // --------------------------- Landsat 9 LST -----------------------------
@@ -86,6 +88,8 @@ var l9lst2025 = L9data2025.select('ST_B10').map(function (image) {
 // median
 var l9lst_median_2025 = l9lst2025.median();
 var l9lst_median_2025_clipped = l9lst_median_2025.clip(greenspace);
+
+
 
 // -------------------------- Visualise LST ------------------------------
 // Landsat LST (adjusted for range 20-50)
@@ -106,11 +110,13 @@ Map.addLayer(l9lst_median_2025_clipped, lst_vis, 'Summer median LST 2025');
 
 
 
-
 // --------------------- Green Space and Buffer LST ----------------------
-// 20 rings × 30m intervals = 600m maximum buffer distance
+
+// define buffer ring distances
+// 30m each, maximum buffer distance of 600m
 var ring_distances = ee.List.sequence(30, 600, 30);
 
+// define function for calculating greenspace and buffer LST
 var greenspace_and_buffer = function(feature) {
 
   var greenspace_geom = feature.geometry().buffer(0, 1);
@@ -122,24 +128,31 @@ var greenspace_and_buffer = function(feature) {
     scale:     30
   });
 
+  // park LST values
   var park_lst_value = ee.Algorithms.If(
     greenspace_stats.contains('ST_B10'),
     greenspace_stats.get('ST_B10'),
+    // if no value, impute as -9999
     ee.Number(-9999)
   );
 
+  // create new column for park LST
   var feature_with_park_lst = feature.set('park_lst', park_lst_value);
 
   // buffer LST values
   var ring_dict = ee.Dictionary(
     ring_distances.iterate(function(distance, dict) {
-
+      
+      // define inner and outer distances
       distance = ee.Number(distance);
       dict     = ee.Dictionary(dict);
 
+      // Landsat 30m pixels, so distance to be 30m
+      // inner distance = distance - 30 to create e.g. 0-30m buffer rings
       var inner_distance = distance.subtract(30);
 
-      // inner boundary
+      // inner buffer
+      // first buffer ring wil be the park polygon geometry
       var inner_geom = ee.Geometry(
         ee.Algorithms.If(
           inner_distance.eq(0),
@@ -148,6 +161,7 @@ var greenspace_and_buffer = function(feature) {
         )
       );
 
+      // outer buffer
       var outer_geom = greenspace_geom.buffer(distance, 1);
 
       // buffer ring = outer buffer minus inner buffer
@@ -180,8 +194,6 @@ var greenspace_and_buffer = function(feature) {
 // Apply to all greenspaces polygons
 var greenspace_buffer_lst = greenspace.map(greenspace_and_buffer);
 
-print('Check 2 parks:');
-print(greenspace_buffer_lst.limit(2));
 
 
 // ---------------------------- Export data -------------------------------
@@ -189,6 +201,6 @@ print(greenspace_buffer_lst.limit(2));
 // One row per park, columns: park_lst, ring_30, ring_60 ... ring_600
 Export.table.toDrive({
   collection:  greenspace_buffer_lst,
-  description: 'greenspace_buffer_lst',
+  description: 'greenspace_buffer_LST',
   fileFormat:  'SHP'
 });
