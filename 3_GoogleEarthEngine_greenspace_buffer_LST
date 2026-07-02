@@ -113,8 +113,8 @@ Map.addLayer(l9lst_median_2025_clipped, lst_vis, 'Summer median LST 2025');
 // --------------------- Green Space and Buffer LST ----------------------
 
 // define buffer ring distances
-// 30m each, maximum buffer distance of 600m
-var ring_distances = ee.List.sequence(30, 600, 30);
+// 30m each, maximum buffer distance of 900m
+var ring_distances = ee.List.sequence(30, 900, 30);
 
 // define function for calculating greenspace and buffer LST
 var greenspace_and_buffer = function(feature) {
@@ -125,7 +125,9 @@ var greenspace_and_buffer = function(feature) {
   var greenspace_stats = l9lst_median_2025.reduceRegion({
     reducer:   ee.Reducer.mean(),
     geometry:  greenspace_geom,
-    scale:     30
+    scale:     30,
+    maxPixels: 1e13,
+    tileScale: 4
   });
 
   // park LST values
@@ -152,7 +154,6 @@ var greenspace_and_buffer = function(feature) {
       var inner_distance = distance.subtract(30);
 
       // inner buffer
-      // first buffer ring wil be the park polygon geometry
       var inner_geom = ee.Geometry(
         ee.Algorithms.If(
           inner_distance.eq(0),
@@ -171,7 +172,9 @@ var greenspace_and_buffer = function(feature) {
       var ring_result = l9lst_median_2025.reduceRegion({
         reducer:   ee.Reducer.mean(),
         geometry:  ring_geom,
-        scale:     30
+        scale:     30,
+        maxPixels: 1e13,
+        tileScale: 4
       });
 
       var ring_mean = ee.Algorithms.If(
@@ -198,7 +201,7 @@ var greenspace_buffer_lst = greenspace.map(greenspace_and_buffer);
 
 // ---------------------------- Export data -------------------------------
 // Export park shapefile with all ring columns
-// One row per park, columns: park_lst, ring_30, ring_60 ... ring_600
+// One row per park, columns: park_lst, ring_30, ring_60 ... ring_900
 Export.table.toDrive({
   collection:  greenspace_buffer_lst,
   description: 'greenspace_buffer_LST',
