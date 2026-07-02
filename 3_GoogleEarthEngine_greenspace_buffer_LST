@@ -1,0 +1,194 @@
+//------------------------------------------------------------------------
+//      Land Surface Temperature Export for London Green Space 
+//                and Green Space Buffer LST (30m)
+//------------------------------------------------------------------------
+
+
+//----------------------- Set London coordinates -------------------------
+var london_point = ee.Geometry.Point([-0.1276, 51.5072]);
+
+Map.centerObject(london_point, 10)
+
+
+
+//------------------------- Load vector data -----------------------------
+// the greenspace shp is removed any park size < 2ha 
+var greenspace_raw = ee.FeatureCollection("users/christychoicc/greenspace_london_2ha");
+
+// Add map layer
+Map.addLayer(greenspace_raw, {}, 'Green spaces');
+
+
+
+// Check geometry types
+var greenspace_typed = greenspace_raw.map(function(feature) {
+  return feature.set('geom_type', feature.geometry().type());
+});
+print('Geometry type counts:')
+print(greenspace_typed.aggregate_histogram('geom_type'));
+
+// Keep polygon geometries only
+var greenspace = greenspace_typed.filter(
+  ee.Filter.inList('geom_type', ['Polygon', 'MultiPolygon'])
+);
+
+print('Number of polygon green spaces:')
+print(greenspace.size());
+
+Map.addLayer(greenspace, {}, 'Green spaces polygons only');
+
+
+// ------------------- Cloud Masking & Scaling Functions ------------------
+// ------------------------- Landsat Scale Factors ------------------------
+function applyScaleFactors(image) {
+  var opticalBands = image.select('SR_B.').multiply(0.0000275).add(-0.2);
+  var thermalBands = image.select('ST_B.*').multiply(0.00341802).add(149.0);
+  return image.addBands(opticalBands, null, true)
+              .addBands(thermalBands, null, true);
+}
+
+// ------------------------ Cloud Masking Functions -----------------------
+var cloudMask = function(image) {
+  var dilatedCloud = (1 << 1)
+  var cirrus = (1 << 2);
+  var cloud = (1 << 3)
+  var cloudShadow = (1 << 4)
+  var qa = image.select('QA_PIXEL');
+  var mask = qa.bitwiseAnd(dilatedCloud).eq(0)
+    .and(qa.bitwiseAnd(cirrus).eq(0))
+    .and(qa.bitwiseAnd(cloud).eq(0))
+    .and(qa.bitwiseAnd(cloudShadow).eq(0));
+  return image.updateMask(mask);
+}
+
+
+
+// ------------------------ Load Landsat data ----------------------------
+// ---------------------------- Landsat 9 --------------------------------
+var L9data2025 = ee.ImageCollection('LANDSAT/LC09/C02/T1_L2')
+    .filterDate('2025-06-01', '2025-08-31')
+    // Filter to London only
+    .filterBounds(london_point)
+    .map(cloudMask)
+    .map(applyScaleFactors);
+
+
+// ----------------------- Land Surface Temperature ----------------------
+
+// --------------------------- Landsat 9 LST -----------------------------
+var l9lst2025 = L9data2025.select('ST_B10').map(function (image) {
+  var subtract = image.subtract(273.15); // subtract
+  var mask = subtract.gt(0); //set mask up
+  var mask_0 = subtract.updateMask(mask); //Apply this in a mask
+  return mask_0;
+})
+
+// median
+var l9lst_median_2025 = l9lst2025.median();
+var l9lst_median_2025_clipped = l9lst_median_2025.clip(greenspace);
+
+// -------------------------- Visualise LST ------------------------------
+// Landsat LST (adjusted for range 20-50)
+var lst_vis = {
+  min: 20, 
+  max: 50, 
+  // palette: ['blue', 'cyan', 'green', 'yellow', 'orange', 'red']
+  palette: [
+    '040274', '040281', '0502a3', '0502b8', '0502ce', '0502e6',
+    '0602ff', '235cb1', '307ef3', '269db1', '30c8e2', '32d3ef',
+    '3be285', '3ff38f', '86e26f', '3ae237', 'b5e22e', 'd6e21f',
+    'fff705', 'ffd611', 'ffb613', 'ff8b13', 'ff6e08', 'ff500d',
+    'ff0000', 'de0101', 'c21301', 'a71001', '911003'
+  ]
+};
+
+Map.addLayer(l9lst_median_2025_clipped, lst_vis, 'Summer median LST 2025');
+
+
+
+
+// --------------------- Green Space and Buffer LST ----------------------
+// 20 rings × 30m intervals = 600m maximum buffer distance
+var ring_distances = ee.List.sequence(30, 600, 30);
+
+var greenspace_and_buffer = function(feature) {
+
+  var greenspace_geom = feature.geometry().buffer(0, 1);
+
+  // park mean LST
+  var greenspace_stats = l9lst_median_2025.reduceRegion({
+    reducer:   ee.Reducer.mean(),
+    geometry:  greenspace_geom,
+    scale:     30
+  });
+
+  var park_lst_value = ee.Algorithms.If(
+    greenspace_stats.contains('ST_B10'),
+    greenspace_stats.get('ST_B10'),
+    ee.Number(-9999)
+  );
+
+  var feature_with_park_lst = feature.set('park_lst', park_lst_value);
+
+  // buffer LST values
+  var ring_dict = ee.Dictionary(
+    ring_distances.iterate(function(distance, dict) {
+
+      distance = ee.Number(distance);
+      dict     = ee.Dictionary(dict);
+
+      var inner_distance = distance.subtract(30);
+
+      // inner boundary
+      var inner_geom = ee.Geometry(
+        ee.Algorithms.If(
+          inner_distance.eq(0),
+          greenspace_geom,
+          greenspace_geom.buffer(inner_distance, 1)
+        )
+      );
+
+      var outer_geom = greenspace_geom.buffer(distance, 1);
+
+      // buffer ring = outer buffer minus inner buffer
+      var ring_geom = outer_geom.difference(inner_geom, 1);
+
+      // mean LST in the ring
+      var ring_result = l9lst_median_2025.reduceRegion({
+        reducer:   ee.Reducer.mean(),
+        geometry:  ring_geom,
+        scale:     30
+      });
+
+      var ring_mean = ee.Algorithms.If(
+        ring_result.contains('ST_B10'),
+        ring_result.get('ST_B10'),
+        ee.Number(-9999)
+      );
+      
+      // column name per ring
+      var property_name = ee.String('ring_').cat(distance.format('%d'));
+
+      return dict.set(property_name, ring_mean);
+
+    }, ee.Dictionary({}))
+  );
+
+  return feature_with_park_lst.set(ring_dict);
+};
+
+// Apply to all greenspaces polygons
+var greenspace_buffer_lst = greenspace.map(greenspace_and_buffer);
+
+print('Check 2 parks:');
+print(greenspace_buffer_lst.limit(2));
+
+
+// ---------------------------- Export data -------------------------------
+// Export park shapefile with all ring columns
+// One row per park, columns: park_lst, ring_30, ring_60 ... ring_600
+Export.table.toDrive({
+  collection:  greenspace_buffer_lst,
+  description: 'greenspace_buffer_lst',
+  fileFormat:  'SHP'
+});
