@@ -20,11 +20,11 @@
 ## Repository Structure
 ```
 london-cooling-access-equity/
-├── 1_Data_Filter_London.Rmd                   # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
-├── 2_GoogleEarthEngine_LST_UHI                # Google Earth Engine code script for London LST; London LSOAs LST; SUHII
-├── 3_GoogleEarthEngine_greenspace_buffer_LST  # Google Earth Engine code script for LST of greenspaces > 2ha and its corresponding buffer rings (30m, 0-600m) 
-├── data/                                      # Folder containing all data files used for this study, available to download below under Data Availability
-├── figures/                                   # Figures presented in the dissertation document
+├── 1_Data_Filter_London.Rmd                      # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
+├── 2_GoogleEarthEngine_LST_UHI                   # Google Earth Engine code script for London LST; London LSOAs LST; SUHII
+├── 3_GoogleEarthEngine_greenspace_buffer_LST     # Google Earth Engine code script for LST of greenspaces > 2ha and its corresponding buffer rings (30m, 0-600m) 
+├── data/                                         # Folder containing all data files used for this study, available to download below under Data Availability
+├── figures/                                      # Figures presented in the dissertation document
 |   ├── Fig.1
 |   ├── Fig.2
 |   └── Fig.3
@@ -38,17 +38,17 @@ The required full project data can be downloaded here: [Download Project Data](h
 After downloading, place it in the project directory using the following structure:
 ```
 data/
-├── raw_data/                                  # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 
-├── greenspace_london/                         # Greenspace polygons shapefile filtered to London only (large file - gitignored)
-├── greenspace_london_2ha/                     # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
-├── lsoa_london/                               # LSOA boundary shapefile filtered to London only (large file - gitignored)
-├── London_LSOA_LST_UHI/                       # LST and SUHII data retreived from Google Earth Engine (large file - gitignored)
-├── London_LST_median.tif                      # Median LST raster data for Greater London retreived from Google Earth Engine
-├── greenspace_buffer_LST/                     # Green space LST and Green space Buffer LST (30m, 0-600m) retreived from Google Earth Engine (large file - gitignored)
-└── r5r/                                       # Data folder for r5r (large file - gitignored)
-    ├── greater-london-260414.osm.pbf          # Road network data
-    ├── gtfs_rail.zip                          # Rail GTFS data
-    └── itm_london_gtfs.zip                    # Bus GTFS data
+├── raw_data/                                     # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 
+├── greenspace_london/                            # Greenspace polygons shapefile filtered to London only (large file - gitignored)
+├── greenspace_london_2ha/                        # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
+├── lsoa_london/                                  # LSOA boundary shapefile filtered to London only (large file - gitignored)
+├── London_LSOA_LST_UHI/                          # LST and SUHII data retreived from Google Earth Engine (large file - gitignored)
+├── London_LST_median.tif                         # Median LST raster data for Greater London retreived from Google Earth Engine
+├── greenspace_buffer_LST/                        # Green space LST and Green space Buffer LST (30m, 0-600m) retreived from Google Earth Engine (large file - gitignored)
+└── r5r/                                          # Data folder for r5r (large file - gitignored)
+    ├── greater-london-260414.osm.pbf             # Road network data
+    ├── gtfs_rail.zip                             # Rail GTFS data
+    └── itm_london_gtfs.zip                       # Bus GTFS data
 ```
 
 The analysis and preprocessing code scripts are to be stored locally under *the data/* directory
