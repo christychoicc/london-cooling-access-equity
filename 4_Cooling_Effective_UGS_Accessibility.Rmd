@@ -453,6 +453,7 @@ cooling_effective %>%
 Plot Map:
 
 ```{r}
+# Match CRS
 gla_boundary <- st_transform(gla_boundary, st_crs(greenspace_pci))
 
 # Create 4 equal-interval PCI breaks using cooling-effective parks only
@@ -462,17 +463,22 @@ pci_breaks <- seq(
   length.out = 5
 )
 
-# Create clean legend labels
+# Clean legend labels
 pci_labels <- paste0(
   sprintf("%.2f", pci_breaks[-length(pci_breaks)]),
   " - ",
   sprintf("%.2f", pci_breaks[-1])
 )
 
+# Blue palette: low PCI = light blue, high PCI = dark blue
+pci_blues <- c(
+  "#C6DBEF", 
+  "#6BAED6", 
+  "#3182BD", 
+  "#08519C"
+)
 
-# Create one mapping category for all parks
-# Cooling-effective parks get PCI bins
-# Other parks get "Not cooling-effective"
+# Create map categories
 greenspace_map <- greenspace_pci %>%
   mutate(
     cooling_effective_flag =
@@ -483,34 +489,32 @@ greenspace_map <- greenspace_pci %>%
       PCI > 0 &
       PCG > 0 &
       r2 >= 0.7,
-    
+
     PCI_bin = cut(
       PCI,
       breaks = pci_breaks,
       labels = pci_labels,
       include.lowest = TRUE
     ),
-    
+
     PCI_map_category = if_else(
       cooling_effective_flag,
       as.character(PCI_bin),
       "Not cooling-effective"
     ),
-    
+
     PCI_map_category = factor(
       PCI_map_category,
-      levels = c("Not cooling-effective", pci_labels)
+      levels = c("Not Cooling-Effective", pci_labels)
     )
   )
 
-
 # Plot map
-# save map as object
 pci_map <- ggplot() +
   geom_sf(
     data = gla_boundary,
     fill = "white",
-    colour = "black",
+    colour = "grey30",
     linewidth = 0.4
   ) +
   geom_sf(
@@ -522,25 +526,32 @@ pci_map <- ggplot() +
     name = "PCI",
     values = c(
       "Not cooling-effective" = "grey80",
-      setNames(viridisLite::viridis(4), pci_labels)
+      setNames(pci_blues, pci_labels)
     ),
     drop = FALSE
   ) +
+  coord_sf(datum = NA) +
   theme_void() +
   theme(
-    plot.title = element_text(hjust = 0.5),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10)
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 14
+    ),
+    legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    legend.key.size = unit(0.45, "cm"),
+    plot.background = element_rect(fill = "white", color = NA)
   )
 
-# display map
 pci_map
 ```
 
 ```{r}
 # save as PNG
 ggsave(
-  filename = "figures/cooling_effective_pci_map.png",
+  filename = "figures/Fig2_Cooling_Effective_UGS_PCI_map.png",
   plot = pci_map,
   width = 10,
   height = 7,
