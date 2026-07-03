@@ -17,22 +17,89 @@ library(sf)
 library(dplyr)
 library(ggplot2)
 library(tidyr)
+library(terra)
+library(tidyterra)
+library(viridis)
 ```
 
 ## Data Loading
 
+Greater London Boundary:
+
 ```{r}
 gla_boundary <- st_read("data/raw_data/gla/London_GLA_Boundary.shp")
 ```
+
+London LST
+
+```{r}
+london_lst <- rast("data/London_LST_median.tif")
+```
+
+Green Space \> 2ha
+
+```{r}
+greenspace2ha <- st_read("data/greenspace_london_2ha/greenspace_london_2ha.shp")
+```
+
+Green Space and Green Space Buffer LST Shapefile:
 
 ```{r}
 # load greenspace buffer lst shapefile exported from GEE
 greenspace <- st_read("data/greenspace_buffer_lst/greenspace_buffer_lst.shp")
 ```
 
-## 1. Park Cooling Quantification
+## 1. Urban Heat 
 
-### 1.1. Data Preparation
+Mean LST and Green Spaces Polygons
+
+```{r}
+# Match CRS
+greenspace2ha <- st_transform(greenspace2ha, crs(london_lst))
+
+# Plot
+lst_map <- ggplot() +
+  geom_spatraster(data = london_lst) +
+  geom_sf(
+    data = greenspace2ha,
+    fill = NA,
+    color = "black",
+    linewidth = 0.4
+  ) +
+  scale_fill_gradientn(
+    colours = c(
+    "#4A78A8",  # lighter cool blue
+    "#6BAED6",  # blue
+    "#9ECAE1",  # light blue
+    "#FFF7BC",  # pale yellow
+    "#FDBB84",  # soft orange
+    "#EF8A62",  # orange-red
+    "#D6604D"   # lighter hot red
+    ),
+    name = "LST (°C) ",
+    na.value = "transparent"
+  ) +
+  coord_sf(expand = FALSE) +
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "right"
+  ) +
+  labs(
+    title = "Mean Land Surface Temperature (LST) and Urban Green Space > 2ha",
+    x = NULL,
+    y = NULL
+  )
+
+lst_map
+```
+
+## 2. Park Cooling Quantification
+
+### 2.1. Data Preparation
 
 ```{r}
 # check column names
@@ -55,7 +122,7 @@ greenspace_clean %>%
   summarise(across(everything(), ~sum(is.na(.))))
 ```
 
-### 1.2. Cubic Polynomial Curve and Park Cooling Intensity (PCI)
+### 2.2. Cubic Polynomial Curve and Park Cooling Intensity (PCI)
 
 | Name | Formula | Literature Support |
 |----|----|----|
@@ -203,7 +270,7 @@ greenspace_pci <- greenspace_clean %>%
   left_join(pci_results, by = "id")
 ```
 
-### 1.3. Identify Cooling Effective UGS
+### 2.3. Identify Cooling Effective UGS
 
 ```{r}
 # identify cooling effective parks
@@ -248,83 +315,19 @@ cooling_effective %>%
   )
 ```
 
-```{r}
-# plot map for checks
-# create 4 equal-interval PCI bins using cooling-effective parks only
-pci_breaks <- seq(
-  min(cooling_effective$PCI, na.rm = TRUE),
-  max(cooling_effective$PCI, na.rm = TRUE),
-  length.out = 5
-)
-
-# clean labels
-pci_labels <- paste0(
-  sprintf("%.2f", pci_breaks[-length(pci_breaks)]),
-  " - ",
-  sprintf("%.2f", pci_breaks[-1])
-)
-
-# create one map category variable for all parks
-greenspace_map <- greenspace_pci %>%
-  mutate(
-    cooling_effective_flag =
-      !is.na(max_lst_diff) &
-      !is.na(PCI) &
-      !is.na(PCG) &
-      max_lst_diff > 0 &
-      PCI > 0 &
-      PCG > 0 &
-      r2 >= 0.7,
-    
-    PCI_bin = cut(
-      PCI,
-      breaks = pci_breaks,
-      labels = pci_labels,
-      include.lowest = TRUE
-    ),
-    
-    PCI_map_category = if_else(
-      cooling_effective_flag,
-      as.character(PCI_bin),
-      "Not cooling-effective"
-    ),
-    
-    PCI_map_category = factor(
-      PCI_map_category,
-      levels = c("Not Cooling-Effective", pci_labels)
-    )
-  )
-
-ggplot(greenspace_map) +
-  geom_sf(aes(fill = PCI_map_category), colour = NA) +
-  scale_fill_manual(
-    name = "PCI",
-    values = c(
-      "Not cooling-effective" = "grey80",
-      setNames(viridisLite::viridis(4), pci_labels)
-    ),
-    drop = FALSE
-  ) +
-  labs(
-    title = "Cooling-Effective Urban Green Spaces by Park Cooling Intensity (PCI)"
-  ) +
-  theme_void() +
-  theme(
-    plot.title = element_text(hjust = 0.5)
-  )
-```
+Plot Map:
 
 ```{r}
 gla_boundary <- st_transform(gla_boundary, st_crs(greenspace_pci))
 
-# 3. Create 4 equal-interval PCI breaks using cooling-effective parks only
+# Create 4 equal-interval PCI breaks using cooling-effective parks only
 pci_breaks <- seq(
   min(cooling_effective$PCI, na.rm = TRUE),
   max(cooling_effective$PCI, na.rm = TRUE),
   length.out = 5
 )
 
-# 4. Create clean legend labels
+# Create clean legend labels
 pci_labels <- paste0(
   sprintf("%.2f", pci_breaks[-length(pci_breaks)]),
   " - ",
@@ -332,7 +335,7 @@ pci_labels <- paste0(
 )
 
 
-# 5. Create one mapping category for all parks
+# Create one mapping category for all parks
 # Cooling-effective parks get PCI bins
 # Other parks get "Not cooling-effective"
 greenspace_map <- greenspace_pci %>%
@@ -366,24 +369,20 @@ greenspace_map <- greenspace_pci %>%
   )
 
 
-# 6. Plot map
-ggplot() +
-  # GLA boundary at the bottom
+# Plot map
+# save map as object
+pci_map <- ggplot() +
   geom_sf(
     data = gla_boundary,
     fill = "white",
     colour = "black",
     linewidth = 0.4
   ) +
-  
-  # All greenspaces on top
   geom_sf(
     data = greenspace_map,
     aes(fill = PCI_map_category),
     colour = NA
   ) +
-  
-  # Manual legend colours
   scale_fill_manual(
     name = "PCI",
     values = c(
@@ -392,21 +391,31 @@ ggplot() +
     ),
     drop = FALSE
   ) +
-  
   labs(
     title = "Cooling-Effective Urban Green Spaces by Park Cooling Intensity"
   ) +
-  
   theme_void() +
   theme(
     plot.title = element_text(hjust = 0.5),
     legend.title = element_text(size = 12),
     legend.text = element_text(size = 10)
   )
+
+# display map
+pci_map
+
+# save as PNG
+ggsave(
+  filename = "figures/cooling_effective_pci_map.png",
+  plot = pci_map,
+  width = 10,
+  height = 7,
+  dpi = 300
+)
 ```
 
-### 1.4. Limitations
+### 2.4. Limitations
 
 Did not remove pixels of water bodies, vegetation that potentially overlap with the buffer rings.
 
-## 2. Multimodal Rapid Realistic Routing (r5r)
+## 3. Multimodal Rapid Realistic Routing (r5r)
