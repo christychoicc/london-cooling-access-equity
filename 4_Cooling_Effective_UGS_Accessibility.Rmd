@@ -14,38 +14,49 @@ gc()
 
 ```{r, message=FALSE, warning=FALSE}
 library(sf)
+library(here)
 library(dplyr)
 library(ggplot2)
+library(tidyverse)
 library(tidyr)
 library(terra)
 library(tidyterra)
 library(viridis)
+library(tmap)
+library(cowplot)
+library(scales)
+library(RColorBrewer)
 ```
 
 ## Data Loading
 
-Greater London Boundary:
+**Greater London Boundary:**
 
 ```{r}
 gla_boundary <- st_read("data/raw_data/gla/London_GLA_Boundary.shp")
 ```
 
-London LST
+**London LST Raster:**
 
 ```{r}
 london_lst <- rast("data/London_LST_median.tif")
 ```
 
-Green Space \> 2ha
+**London LSOA LST and SUHII:**
+
+```{r}
+lsoa_lst <- st_read("data/London_LSOA_LST_UHI/London_LSOA_LST_UHI.shp")
+```
+
+**Green Space \> 2ha:**
 
 ```{r}
 greenspace2ha <- st_read("data/greenspace_london_2ha/greenspace_london_2ha.shp")
 ```
 
-Green Space and Green Space Buffer LST Shapefile:
+**Green Space and Green Space Buffer LST:**
 
 ```{r}
-# load greenspace buffer lst shapefile exported from GEE
 greenspace <- st_read("data/greenspace_buffer_lst/greenspace_buffer_lst.shp")
 ```
 
@@ -88,11 +99,6 @@ lst_map <- ggplot() +
     axis.ticks = element_blank(),
     legend.position = "right",
     plot.title = element_text(hjust = 0.5)
-  ) +
-  labs(
-    title = "Mean Land Surface Temperature (LST) and Urban Green Space > 2ha",
-    x = NULL,
-    y = NULL
   )
 
 lst_map
@@ -104,6 +110,124 @@ ggsave(
   plot = lst_map,
   width = 10,
   height = 8,
+  dpi = 300
+)
+```
+
+**SUHII = LST (LSOA) - LST (London):**
+
+```{r}
+# Fix geometry
+lsoa_lst <- st_make_valid(lsoa_lst)
+
+# Colours: blue = cooler than London mean, red = hotter than London mean
+diff_cols <- rev(brewer.pal(11, "RdBu"))
+
+
+# define SUHII breaks
+# data range: -9.98 to 8.53 so use -10 and 10 range
+lims <- c(-10, 10)
+
+# colours group into 2°C intervals
+breaks_seq <- seq(-10, 10, by = 2)
+
+# map plot
+map_plot <- ggplot(lsoa_lst) +
+  geom_sf(
+    aes(fill = lst_differ),
+    color = NA,
+    linewidth = 0
+  ) +
+  scale_fill_stepsn(
+    colours = diff_cols,
+    breaks = breaks_seq,
+    limits = lims,
+    oob = squish,
+    name = "SUHII"
+  ) +
+  coord_sf(datum = NA) +
+  theme_void() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 14
+    ),
+    plot.margin = margin(5, 5, 5, 5)
+  )
+
+# histogram legend plot - each bar = 0.1°C
+# colours group into 2°C intervals
+hist_legend <- ggplot(
+  st_drop_geometry(lsoa_lst),
+  aes(x = lst_differ)
+) +
+  geom_histogram(
+    aes(fill = after_stat(x)),
+    binwidth = 0.1,
+    boundary = -10,
+    color = NA
+  ) +
+  geom_vline(
+    xintercept = breaks_seq,
+    linetype = "dashed",
+    linewidth = 0.35,
+    color = "black"
+  ) +
+  scale_fill_stepsn(
+    colours = diff_cols,
+    breaks = breaks_seq,
+    limits = lims,
+    oob = squish,
+    guide = "none"
+  ) +
+  scale_x_continuous(
+    limits = lims,
+    breaks = seq(-10, 10, by = 4),
+    labels = label_number(accuracy = 1)
+  ) +
+  labs(
+    x = "SUHII (°C)",
+    y = "LSOA Count"
+  ) +
+  theme_classic(base_size = 9) +
+  theme(
+    axis.title = element_text(size = 9),
+    axis.text = element_text(size = 7),
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.margin = margin(3, 3, 3, 3)
+  )
+
+
+# put histogram next to map
+suhii_tm <- ggdraw() +
+  draw_plot(
+    map_plot,
+    x = 0,
+    y = 0,
+    width = 0.78,   # make map narrower
+    height = 1
+  ) +
+  draw_plot(
+    hist_legend,
+    x = 0.63,       # move histogram into right-side empty space
+    y = 0.11,
+    width = 0.25,
+    height = 0.22
+  )
+
+suhii_tm
+```
+
+```{r}
+ggsave(
+  "figures/Fig3_LSOA_SUHII.png",
+  plot = suhii_tm,
+  width = 9,
+  height = 6,
+  units = "in",
   dpi = 300
 )
 ```
@@ -401,9 +525,6 @@ pci_map <- ggplot() +
       setNames(viridisLite::viridis(4), pci_labels)
     ),
     drop = FALSE
-  ) +
-  labs(
-    title = "Cooling-Effective Urban Green Spaces by Park Cooling Intensity"
   ) +
   theme_void() +
   theme(
