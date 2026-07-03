@@ -73,22 +73,38 @@ lst_map <- ggplot() +
   geom_spatraster(data = london_lst) +
   geom_sf(
     data = greenspace2ha,
+    aes(colour = "Selected\nUGS"),
     fill = NA,
-    color = "black",
-    linewidth = 0.3
+    linewidth = 0.3,
+    key_glyph = "polygon"
   ) +
   scale_fill_gradientn(
     colours = c(
-    "#3F78B5",  # more vibrant blue
-    "#5DA5DA",  # brighter blue
-    "#9FD3E8",  # light blue
-    "#FFF3A6",  # warmer pale yellow
-    "#FDB366",  # stronger soft orange
-    "#F67E4B",  # more vibrant orange-red
-    "#D94E41"   # warmer red
+      "#3F78B5",
+      "#5DA5DA",
+      "#9FD3E8",
+      "#FFF3A6",
+      "#FDB366",
+      "#F67E4B",
+      "#D94E41"
     ),
-    name = "LST (°C) ",
+    name = "LST (°C)",
     na.value = "transparent"
+  ) +
+  scale_colour_manual(
+    name = NULL,
+    values = c("Selected\nUGS" = "black")
+  ) +
+  guides(
+    fill = guide_colourbar(order = 1),
+    colour = guide_legend(
+      order = 2,
+      override.aes = list(
+        fill = NA,
+        colour = "black",
+        linewidth = 0.7
+      )
+    )
   ) +
   coord_sf(expand = FALSE) +
   theme_minimal() +
@@ -98,6 +114,8 @@ lst_map <- ggplot() +
     axis.title = element_blank(),
     axis.ticks = element_blank(),
     legend.position = "right",
+    legend.text = element_text(size = 10),
+    legend.key.size = unit(0.6, "cm"),
     plot.title = element_text(hjust = 0.5)
   )
 
@@ -106,7 +124,7 @@ lst_map
 
 ```{r}
 ggsave(
-  filename = "figures/mean_lst_greenspace2ha_map.png",
+  filename = "figures/Fig1_Mean_LST_Greenspace_2ha_map.png",
   plot = lst_map,
   width = 10,
   height = 8,
