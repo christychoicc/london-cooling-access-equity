@@ -49,12 +49,14 @@ greenspace_clean %>%
   summarise(across(everything(), ~sum(is.na(.))))
 ```
 
-### 1.2. Cubic Polynomial Fitting and Park Cooling Intensity (PCI)
+### 1.2. Cubic Polynomial Curve and Park Cooling Intensity (PCI)
 
-| Name                         | Formula                         |
-|------------------------------|---------------------------------|
-| Cublic Polynomial Fitting    | **T(x) = ax³ + bx² + cx + d**   |
-| Park Cooling Intensity (PCI) | **PCI = L × T_L − ∫₀ᴸ T(x) dx** |
+| Name | Formula | Literature Support |
+|----|----|----|
+| Cublic Polynomial Curve | T(x) = ax³ + bx² + cx + d | Du *et al.*, 2022; Cai *et al.*, 2023; Yang *et al.*, 2024 |
+| Accumulated PCI | PCI = L × T_L − ∫₀ᴸ T(x) dx | Du *et al.*, 2022; Zhang *et al.*, 2024 |
+| Normalised PCI | \\(PCI = \\frac{PCI\_{acc}}{L\_{max} \\times TD}\\) | Zhang *et al.*, 2024 |
+| Park Cooling Gradient (PCG) | \\(PCG = \\frac{PCI\_{acc}}{L\_{max}}\\) | Yang *et al.*, 2024; Zhang *et al.*, 2024 |
 
 ```{r}
 # Ring distances in metres — x values for polynomial fitting
@@ -92,12 +94,12 @@ for (i in 1:nrow(greenspace_clean)) {
   disc <- (2*b)^2 - 4*(3*a)*c
   # parks with no valid inflection/ turning point, return as NA
   if (is.na(disc) || disc < 0) {
-    d_max           <- NA
+    Lmax           <- NA
     T_L             <- NA
     PCI_accumulated <- NA
     PCI             <- NA
     PCG             <- NA
-    dTmax           <- NA
+    temp_diff           <- NA
   } else {
    
     # distances where temp stops increasing/ decreasing
@@ -109,12 +111,12 @@ for (i in 1:nrow(greenspace_clean)) {
     valid_roots <- valid_roots[valid_roots >= 30 & valid_roots <= 900]
     
     if (length(valid_roots) == 0) {
-      d_max           <- NA
+      Lmax           <- NA
       T_L             <- NA
       PCI_accumulated <- NA
       PCI             <- NA
       PCG             <- NA
-      dTmax           <- NA
+      temp_diff           <- NA
     } else {
       
       # identify whether inflection point is at highest point of curve
@@ -125,39 +127,39 @@ for (i in 1:nrow(greenspace_clean)) {
       peak_roots <- valid_roots[second_derivative < 0]
       # if it s not a peak, return as NA
       if (length(peak_roots) == 0) {
-        d_max           <- NA
+        Lmax           <- NA
         T_L             <- NA
         PCI_accumulated <- NA
         PCI             <- NA
         PCG             <- NA
-        dTmax           <- NA
+        temp_diff           <- NA
       } else {
         
         # select the initial inflection point (first peak) as cooling distance
-        d_max <- min(peak_roots)
+        Lmax <- min(peak_roots)
         
-        # calculate fitted LST at the d_max
-        T_L <- a * d_max^3 + b * d_max^2 + c * d_max + d
+        # calculate fitted LST at the Lmax
+        T_L <- a * Lmax^3 + b * Lmax^2 + c * Lmax + d
         
-        # calculate integral of fitted T(x) from 0 to d_max
+        # calculate integral of fitted T(x) from 0 to Lmax
         # aka summarise the temp pattern from park geom to the cooling distance
-        integral <- (a/4 * d_max^4) +
-          (b/3 * d_max^3) + 
-          (c/2 * d_max^2) + 
-          (d   * d_max)
+        integral <- (a/4 * Lmax^4) +
+          (b/3 * Lmax^3) + 
+          (c/2 * Lmax^2) + 
+          (d   * Lmax)
         
         # calculate PCI accumulated
-        PCI_accumulated <- (d_max * T_L) - integral
+        PCI_accumulated <- (Lmax * T_L) - integral
         
         # PCI
-        PCI <- PCI_accumulated / (d_max * T_L)
+        PCI <- PCI_accumulated / (Lmax * T_L)
         
         # calculate PCG (Park cooling gradient)
         # PCG = accumulated cooling area/ maximum cooling distance (https://www.sciencedirect.com/science/article/pii/S2210670723007205)
-        PCG <- PCI_accumulated / d_max
+        PCG <- PCI_accumulated / Lmax
         
         # calculate max temperature difference
-        dTmax <- T_L - park_lst
+        temp_diff <- T_L - park_lst
       }
     }
   }
@@ -166,9 +168,9 @@ for (i in 1:nrow(greenspace_clean)) {
   results[[i]] <- data.frame(
     id = park$id,                           # park ID
     r2 = round(r2, 3),                      # R squared, how well the curve fits the data
-    d_max = round(d_max, 1),                # estimated cooling distance
-    T_L = round(T_L, 2),                    # temp at d_max
-    dTmax = round(dTmax, 2),                # difference between surrounding temp and park temp
+    Lmax = round(Lmax, 1),                # estimated cooling distance
+    T_L = round(T_L, 2),                    # temp at Lmax
+    temp_diff = round(temp_diff, 2),                # difference between surrounding temp and park temp
     PCI_accumulated = round(PCI_accumulated, 1),   # accumulated cooling area, old PCI formula
     PCI = round(PCI, 4),                    # normalised PCI
     PCG = round(PCG, 2)                     # park cooling gradient
@@ -202,11 +204,11 @@ greenspace_pci <- greenspace_clean %>%
 cooling_effective <- greenspace_pci %>%
   filter(
     # filter away all NA
-    !is.na(dTmax),
+    !is.na(temp_diff),
     !is.na(PCI),
     !is.na(PCG),
     # filter temp difference > 0
-    dTmax > 0,
+    temp_diff > 0,
     # filter normalised cooling > 0
     PCI > 0,
     # filter PCG > 0
@@ -232,8 +234,8 @@ cooling_effective %>%
     median_PCG = median(PCG, na.rm = TRUE),
     min_PCG = min(PCG, na.rm = TRUE),
     max_PCG = max(PCG, na.rm = TRUE),
-    mean_dmax = mean(d_max, na.rm = TRUE),
-    median_dmax = median(d_max, na.rm = TRUE)
+    mean_dmax = mean(Lmax, na.rm = TRUE),
+    median_dmax = median(Lmax, na.rm = TRUE)
   )
 ```
 
@@ -256,6 +258,6 @@ ggplot(greenspace_pci) +
 
 ### 1.4. Limitations
 
-Did not remove pixels of water bodies, vegetation that potentially overlap with the buffer rings. Large imprevious surfaces as well.
+Did not remove pixels of water bodies, vegetation that potentially overlap with the buffer rings.
 
 ## 2. Multimodal Rapid Realistic Routing (r5r)
