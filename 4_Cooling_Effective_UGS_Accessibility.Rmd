@@ -64,17 +64,17 @@ lst_map <- ggplot() +
     data = greenspace2ha,
     fill = NA,
     color = "black",
-    linewidth = 0.4
+    linewidth = 0.3
   ) +
   scale_fill_gradientn(
     colours = c(
-    "#4A78A8",  # lighter cool blue
-    "#6BAED6",  # blue
-    "#9ECAE1",  # light blue
-    "#FFF7BC",  # pale yellow
-    "#FDBB84",  # soft orange
-    "#EF8A62",  # orange-red
-    "#D6604D"   # lighter hot red
+    "#3F78B5",  # more vibrant blue
+    "#5DA5DA",  # brighter blue
+    "#9FD3E8",  # light blue
+    "#FFF3A6",  # warmer pale yellow
+    "#FDB366",  # stronger soft orange
+    "#F67E4B",  # more vibrant orange-red
+    "#D94E41"   # warmer red
     ),
     name = "LST (°C) ",
     na.value = "transparent"
@@ -86,7 +86,8 @@ lst_map <- ggplot() +
     axis.text = element_blank(),
     axis.title = element_blank(),
     axis.ticks = element_blank(),
-    legend.position = "right"
+    legend.position = "right",
+    plot.title = element_text(hjust = 0.5)
   ) +
   labs(
     title = "Mean Land Surface Temperature (LST) and Urban Green Space > 2ha",
@@ -95,6 +96,16 @@ lst_map <- ggplot() +
   )
 
 lst_map
+```
+
+```{r}
+ggsave(
+  filename = "figures/mean_lst_greenspace2ha_map.png",
+  plot = lst_map,
+  width = 10,
+  height = 8,
+  dpi = 300
+)
 ```
 
 ## 2. Park Cooling Quantification
@@ -403,7 +414,9 @@ pci_map <- ggplot() +
 
 # display map
 pci_map
+```
 
+```{r}
 # save as PNG
 ggsave(
   filename = "figures/cooling_effective_pci_map.png",
