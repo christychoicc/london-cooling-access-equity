@@ -28,8 +28,8 @@ london-cooling-access-equity/
 ├── 1_Data_Filter_London.Rmd                      # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
 ├── 2_GoogleEarthEngine_LST_UHI                   # Google Earth Engine code script for London LST; London LSOAs LST; SUHII
 ├── 3_GoogleEarthEngine_greenspace_buffer_LST     # Google Earth Engine code script for LST of greenspaces > 2ha and its corresponding buffer rings (30m, 0-900m) 
-├── 4_Urban_Heat_Cooling_Effective_UGS.Rmd        # Analysis Markdown
-├── 5_
+├── 4_Urban_Heat_Cooling_Effective_UGS.Rmd        # Urban Heat and Park Cooling Metrics; Identify Cooling Effective UGS
+├── 5_Multimodal_Travel_Time_r5r.Rmd              # 
 ├── 6_
 ├── data/                                         # Folder containing all data files used for this study, available to download below under Data Availability
 ├── figures/                                      # Figures presented in the dissertation document
@@ -56,9 +56,9 @@ data/
 ├── greenspace_buffer_LST/                        # Green space LST and Green space Buffer LST (30m, 0-900m) retreived from Google Earth Engine (large file - gitignored)
 ├── cooling_effective_UGS/
 └── r5r/                                          # Data folder for r5r (large file - gitignored)
-    ├── greater-london-260414.osm.pbf             # Road network data
-    ├── gtfs_rail.zip                             # Rail GTFS data
-    └── itm_london_gtfs.zip                       # Bus GTFS data
+|   ├── greater-london-260414.osm.pbf             # Road network data
+|   ├── gtfs_rail.zip                             # Rail GTFS data
+|   └── itm_london_gtfs.zip                       # Bus GTFS data
 ```
 
 The analysis and preprocessing code scripts are to be stored locally under *the data/* directory
