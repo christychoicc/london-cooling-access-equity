@@ -45,12 +45,13 @@ After downloading, place it in the project directory using the following structu
 ```
 data/
 ├── raw_data/                                     # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 
-├── greenspace_london/                            # Greenspace polygons shapefile filtered to London only (large file - gitignored)
-├── greenspace_london_2ha/                        # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
 ├── lsoa_london/                                  # LSOA boundary shapefile filtered to London only (large file - gitignored)
 ├── London_LSOA_LST_UHI/                          # LST and SUHII data retreived from Google Earth Engine (large file - gitignored)
 ├── London_LST_median.tif                         # Median LST raster data for Greater London retreived from Google Earth Engine
+├── greenspace_london/                            # Greenspace polygons shapefile filtered to London only (large file - gitignored)
+├── greenspace_london_2ha/                        # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
 ├── greenspace_buffer_LST/                        # Green space LST and Green space Buffer LST (30m, 0-900m) retreived from Google Earth Engine (large file - gitignored)
+├── cooling_effective_UGS/
 └── r5r/                                          # Data folder for r5r (large file - gitignored)
     ├── greater-london-260414.osm.pbf             # Road network data
     ├── gtfs_rail.zip                             # Rail GTFS data
