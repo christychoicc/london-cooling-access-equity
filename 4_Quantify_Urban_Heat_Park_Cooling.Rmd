@@ -339,7 +339,7 @@ for (i in 1:nrow(greenspace_clean)) {
   disc <- (2*b)^2 - 4*(3*a)*c
   # parks with no valid turning point, return as NA
   if (is.na(disc) || disc < 0) {
-    Lmax <- NA
+    L <- NA
     # LST value at the first turning point
     TL <- NA
     accumulated_cooling <- NA
@@ -357,7 +357,7 @@ for (i in 1:nrow(greenspace_clean)) {
     valid_roots <- valid_roots[valid_roots >= 30 & valid_roots <= 900]
     
     if (length(valid_roots) == 0) {
-      Lmax <- NA
+      L <- NA
       TL <- NA
       accumulated_cooling <- NA
       PCI <- NA
@@ -366,14 +366,14 @@ for (i in 1:nrow(greenspace_clean)) {
     } else {
       
       # identify whether turning point is at highest point of curve
-      # T''(x) = 6ax + 2b
+      # derivative: T''(x) = 6ax + 2b
       second_derivative <- 6 * a * valid_roots + 2 * b
       
-      # Keep only peaks
+      # keep only peaks
       peak_roots <- valid_roots[second_derivative < 0]
       # if it s not a peak, return as NA
       if (length(peak_roots) == 0) {
-        Lmax <- NA
+        L <- NA
         TL <- NA
         accumulated_cooling <- NA
         PCI <- NA
@@ -382,26 +382,25 @@ for (i in 1:nrow(greenspace_clean)) {
       } else {
         
         # select the initial turning point (first peak) as cooling distance
-        Lmax <- min(peak_roots)
+        L <- min(peak_roots)
         
-        # calculate fitted LST at the Lmax
-        TL <- a * Lmax^3 + b * Lmax^2 + c * Lmax + d
+        # calculate fitted LST at the L
+        TL <- a * L^3 + b * L^2 + c * L + d
         
-        # calculate actual_accumulated_lst from 0 to Lmax
-        actual_accumulated_lst <- (a/4 * Lmax^4) +
-          (b/3 * Lmax^3) + 
-          (c/2 * Lmax^2) + 
-          (d   * Lmax)
+        # calculate actual_accumulated_lst from 0 to L
+        actual_accumulated_lst <- (a/4 * L^4) +
+          (b/3 * L^3) + 
+          (c/2 * L^2) + 
+          (d   * L)
         
         # calculate accumulated PCI
-        accumulated_cooling <- (Lmax * TL) - actual_accumulated_lst
+        accumulated_cooling <- (L * TL) - actual_accumulated_lst
         
         # PCI
-        PCI <- accumulated_cooling / (Lmax * TL)
+        PCI <- accumulated_cooling / (L * TL)
         
-        # calculate PCG (Park cooling gradient)
-        # PCG = accumulated cooling area/ maximum cooling distance (https://www.sciencedirect.com/science/article/pii/S2210670723007205)
-        PCG <- accumulated_cooling / Lmax
+        # calculate PCG
+        PCG <- accumulated_cooling / L
         
         # calculate max temperature difference
         max_lst_diff <- TL - park_lst
@@ -413,12 +412,12 @@ for (i in 1:nrow(greenspace_clean)) {
   results[[i]] <- data.frame(
     id = park$id, # park ID
     r2 = round(r2, 3), # R squared, how well the curve fits the data
-    Lmax = round(Lmax, 1), # estimated cooling distance
-    TL = round(TL, 2), # temp at Lmax
+    L = round(L, 1), # estimated cooling distance
+    TL = round(TL, 2), # temp at L
     max_lst_diff = round(max_lst_diff, 2), # difference between surrounding temp and park temp
-    accumulated_cooling = round(accumulated_cooling, 1), # accumulated cooling area, old PCI formula
+    accumulated_cooling = round(accumulated_cooling, 1), # accumulated cooling
     PCI = round(PCI, 4), # PCI
-    PCG = round(PCG, 2) # park cooling gradient
+    PCG = round(PCG, 2) # PCG
   )
 }
 
@@ -449,7 +448,7 @@ greenspace_pci <- greenspace_clean %>%
 cooling_effective <- greenspace_pci %>%
   filter(
     # filter away all NA
-    !is.na(Lmax),
+    !is.na(L),
     !is.na(max_lst_diff),
     !is.na(PCI),
     !is.na(PCG),
@@ -463,7 +462,7 @@ cooling_effective <- greenspace_pci %>%
 ```
 
 ```{r}
-# check number of cooling effective UGS: 
+# check number of cooling effective UGS
 nrow(cooling_effective)
 ```
 
@@ -489,9 +488,9 @@ cooling_effective %>%
     max_PCG = max(PCG, na.rm = TRUE),
     mean_PCG = mean(PCG, na.rm = TRUE),
     median_PCG = median(PCG, na.rm = TRUE),
-    # Lmax
-    mean_Lmax = mean(Lmax, na.rm = TRUE),
-    median_Lmax = median(Lmax, na.rm = TRUE)
+    # L
+    mean_L = mean(L, na.rm = TRUE),
+    median_L = median(L, na.rm = TRUE)
   )
 ```
 
