@@ -45,7 +45,7 @@ london_lst <- rast("data/London_LST_median.tif")
 **London LSOA LST and SUHII:**
 
 ```{r}
-lsoa_lst <- st_read("data/London_LSOA_LST_UHI/London_LSOA_LST_UHI.shp")
+lsoa_lst <- st_read("data/London_LSOA_LST_SUHI/London_LSOA_LST_SUHI.shp")
 ```
 
 **Green Space \> 2ha:**
@@ -60,7 +60,7 @@ greenspace2ha <- st_read("data/greenspace_london_2ha/greenspace_london_2ha.shp")
 greenspace <- st_read("data/greenspace_buffer_lst/greenspace_buffer_lst.shp")
 ```
 
-## 1. Urban Heat 
+## 1. Urban Heat
 
 **Map: Mean LST and Green Spaces Polygons**
 
@@ -544,7 +544,7 @@ pci_map <- ggplot() +
   scale_fill_manual(
     name = "PCI",
     values = c(
-      "Not cooling-effective" = "grey80",
+      "Not Cooling-Effective" = "grey80",
       setNames(pci_blues, pci_labels)
     ),
     drop = FALSE

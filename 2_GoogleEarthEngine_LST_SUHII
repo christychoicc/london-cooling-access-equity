@@ -225,6 +225,6 @@ var mean_LST_LSOA_with_difference = mean_LST_LSOA.map(function(feature) {
 // Export LSOA table as shapefile
 Export.table.toDrive({
   collection: mean_LST_LSOA_with_difference,
-  description: 'London_LSOA_LST_UHI',
+  description: 'London_LSOA_LST_SUHI',
   fileFormat: 'SHP'
 });
