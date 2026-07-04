@@ -499,8 +499,9 @@ cooling_effective %>%
 ```{r}
 # Match CRS
 gla_boundary <- st_transform(gla_boundary, st_crs(greenspace_pci))
+cooling_effective <- st_transform(cooling_effective, st_crs(greenspace_pci))
 
-# Create 4 equal-interval PCI breaks using cooling-effective parks only
+# Create 4 equal-interval PCI breaks using cooling-effective UGS only
 pci_breaks <- seq(
   min(cooling_effective$PCI, na.rm = TRUE),
   max(cooling_effective$PCI, na.rm = TRUE),
@@ -522,37 +523,18 @@ pci_blues <- c(
   "#08519C"
 )
 
-# Create map categories
-greenspace_map <- greenspace_pci %>%
+# Add PCI classes to cooling-effective UGS only
+cooling_effective_map <- cooling_effective %>%
   mutate(
-    cooling_effective_flag =
-      !is.na(max_lst_diff) &
-      !is.na(PCI) &
-      !is.na(PCG) &
-      max_lst_diff > 0 &
-      PCI > 0 &
-      PCG > 0,
-
     PCI_bin = cut(
       PCI,
       breaks = pci_breaks,
       labels = pci_labels,
       include.lowest = TRUE
-    ),
-
-    PCI_map_category = if_else(
-      cooling_effective_flag,
-      as.character(PCI_bin),
-      "Not Cooling-Effective"
-    ),
-
-    PCI_map_category = factor(
-      PCI_map_category,
-      levels = c("Not Cooling-Effective", pci_labels)
     )
   )
 
-# Plot map
+# Plot map: all greenspaces grey underneath, cooling-effective UGS on top
 pci_map <- ggplot() +
   geom_sf(
     data = gla_boundary,
@@ -561,26 +543,23 @@ pci_map <- ggplot() +
     linewidth = 0.4
   ) +
   geom_sf(
-    data = greenspace_map,
-    aes(fill = PCI_map_category),
+    data = greenspace_pci,
+    fill = "grey80",
+    colour = NA
+  ) +
+  geom_sf(
+    data = cooling_effective_map,
+    aes(fill = PCI_bin),
     colour = NA
   ) +
   scale_fill_manual(
     name = "PCI",
-    values = c(
-      "Not Cooling-Effective" = "grey80",
-      setNames(pci_blues, pci_labels)
-    ),
+    values = setNames(pci_blues, pci_labels),
     drop = FALSE
   ) +
   coord_sf(datum = NA) +
   theme_void() +
   theme(
-    plot.title = element_text(
-      hjust = 0.5,
-      face = "bold",
-      size = 14
-    ),
     legend.position = "right",
     legend.title = element_text(size = 12, face = "bold"),
     legend.text = element_text(size = 10),
