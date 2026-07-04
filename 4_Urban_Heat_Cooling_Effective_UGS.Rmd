@@ -62,7 +62,7 @@ greenspace <- st_read("data/greenspace_buffer_lst/greenspace_buffer_lst.shp")
 
 ## 1. Urban Heat 
 
-Mean LST and Green Spaces Polygons
+**Map: Mean LST and Green Spaces Polygons**
 
 ```{r}
 # Ensure consistent CRS 
@@ -134,7 +134,7 @@ ggsave(
 )
 ```
 
-**SUHII = LST (LSOA) - LST (London):**
+**Map: SUHII = LST (LSOA) - LST (London)**
 
 ```{r}
 # Fix geometry
@@ -470,7 +470,7 @@ cooling_effective %>%
   )
 ```
 
-Plot Map:
+**Map: Cooling Effective UGS by PCI**
 
 ```{r}
 # Match CRS
@@ -507,8 +507,7 @@ greenspace_map <- greenspace_pci %>%
       !is.na(PCG) &
       max_lst_diff > 0 &
       PCI > 0 &
-      PCG > 0 &
-      r2 >= 0.7,
+      PCG > 0,
 
     PCI_bin = cut(
       PCI,
@@ -580,8 +579,24 @@ ggsave(
 )
 ```
 
-### 2.4. Limitations
+### 2.4. Save as Shapefile
+
+```{r}
+# create a folder
+dir.create("data/cooling_effective_UGS", recursive = TRUE, showWarnings = FALSE)
+
+# only cooling-effective greenspaces
+cooling_effective_greenspace <- greenspace_map %>%
+  filter(cooling_effective_flag == TRUE)
+
+# Save as shapefile
+st_write(
+  cooling_effective_greenspace,
+  "data/cooling_effective_UGS/cooling_effective_UGS.shp",
+  delete_dsn = TRUE
+)
+```
+
+### 2.5. Limitations
 
 Did not remove pixels of water bodies, vegetation that potentially overlap with the buffer rings.
-
-## 3. Multimodal Rapid Realistic Routing (r5r)

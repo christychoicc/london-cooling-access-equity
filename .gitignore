@@ -69,5 +69,8 @@ data/greenspace_london_2ha*
 data/London_LSOA_LST_UHI*
 data/greenspace_buffer_LST*
 
+# R process files
+data/cooling_effective_UGS*
+
 # r5r data: 
 data/r5r*
