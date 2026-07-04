@@ -3,3 +3,19 @@ title: "5_Multimodal_Travel_Time"
 ---
 
 ## Multimodal Rapid Realistic Routing (r5r)
+
+```{r}
+# Load cooling-effective greenspace shapefile
+cooling_effective_UGS <- st_read("data/cooling_effective_UGS/cooling_effective_UGS.shp")
+```
+
+```{r}
+# Column names
+names(cooling_effective_UGS)
+```
+
+1.  Load the file
+2.  functions of park may need some filtering
+3.  Join greenspace access points
+4.  use those as destinations
+5.  run r5r

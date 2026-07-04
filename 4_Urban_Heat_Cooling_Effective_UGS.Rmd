@@ -585,13 +585,9 @@ ggsave(
 # create a folder
 dir.create("data/cooling_effective_UGS", recursive = TRUE, showWarnings = FALSE)
 
-# only cooling-effective greenspaces
-cooling_effective_greenspace <- greenspace_map %>%
-  filter(cooling_effective_flag == TRUE)
-
 # Save as shapefile
 st_write(
-  cooling_effective_greenspace,
+  cooling_effective,
   "data/cooling_effective_UGS/cooling_effective_UGS.shp",
   delete_dsn = TRUE
 )
