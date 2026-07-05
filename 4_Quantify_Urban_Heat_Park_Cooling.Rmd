@@ -230,13 +230,13 @@ suhii_tm <- ggdraw() +
     map_plot,
     x = 0,
     y = 0,
-    width = 0.78,
+    width = 0.9,
     height = 1
   ) +
   draw_plot(
     hist_legend,
-    x = 0.63,
-    y = 0.11,
+    x = 0.72,
+    y = 0.10,
     width = 0.25,
     height = 0.22
   )
@@ -252,7 +252,8 @@ ggsave(
   width = 11.69,
   height = 8.27,
   units = "in",
-  dpi = 300
+  dpi = 300,
+  bg = "white"
 )
 ```
 
@@ -546,7 +547,7 @@ pci_map <- ggplot() +
   ) +
   geom_sf(
     data = greenspace_pci,
-    aes(fill = "Other UGS"),
+    aes(fill = "< 0.00"),
     colour = NA
   ) +
   geom_sf(
@@ -557,10 +558,10 @@ pci_map <- ggplot() +
   scale_fill_manual(
     name = "PCI",
     values = c(
-      "Other UGS" = "grey80",
+      "< 0.00" = "grey80",
       setNames(pci_blues, pci_labels)
     ),
-    breaks = c("Other UGS", pci_labels),
+    breaks = c("< 0.00", pci_labels),
     drop = FALSE
   ) +
   coord_sf(datum = NA) +
