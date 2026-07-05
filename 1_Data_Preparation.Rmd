@@ -1,5 +1,5 @@
 ---
-title: "1_Data_Filter_London"
+title: "1_Data_Preparation"
 ---
 
 This markdown file contans the code for filtering the downloaded raw data sets to the Greater London study area. These are pre-filtered for further data preprocessing in Google Earth Engine. The filtered data sets are saved as follows:
@@ -7,6 +7,8 @@ This markdown file contans the code for filtering the downloaded raw data sets t
 1.  `lsoa_london` : LSOA boundaries filtered for London only
 2.  `greenspace_london` : green space polygons filtered for any intersecting the Greater London boundary
 3.  `greenspace_london_2ha` : green space polygons filtered for any intersecting the Greater London boundary, and sizes bigger than 2ha only (as informed by literature)
+4.  `london_lsoa_pop_weighted_centroids.shp` : LSOA population weighted centroids filtered for Greater London only
+5.  `gtfs_rail.zip` : converted rail timetable data into GTFS format.
 
 ## Load Packages
 
@@ -122,4 +124,32 @@ nrow(london_pop_weighted_centroids)
 
 ```{r}
 st_write(london_pop_weighted_centroids, "data/london_lsoa_pop_weighted_centroids/london_lsoa_pop_weighted_centroids.shp")
+```
+
+## 5. Rail GTFS
+
+```{r, eval=FALSE}
+# Data taken from National Rail Portal
+# Save username and password
+install.packages("usethis")
+library(usethis)
+
+usethis::edit_r_environ()
+```
+
+```{r, eval=FALSE}
+# Restarted R session, so load this library again
+# Load the specific package for converting to GTFS
+library(UK2GTFS)
+
+nrdp_timetable("data/raw_data/timetable.zip")
+
+path_in <- "data/raw_data/timetable.zip"
+gtfs_rail <- atoc2gtfs(path_in = path_in,
+                       ncores = 5)
+
+gtfs_write(gtfs_rail,
+           folder = "data/r5r",
+           name = "gtfs_rail"
+)
 ```
