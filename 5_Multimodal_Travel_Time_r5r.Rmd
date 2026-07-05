@@ -13,19 +13,121 @@ gc()
 ## Load Packages
 
 ```{r, message=FALSE, warning=FALSE}
-
+library(sf)
+library(here)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
 ```
 
 ## Data Loading
 
+**Cooling Effective UGS shp** (exported from 4_Quantify_Urban_Heat_Park_Cooling.Rmd)\_
+
 ```{r}
 # Load cooling-effective greenspace shapefile
-cooling_effective_UGS <- st_read("data/cooling_effective_UGS/cooling_effective_UGS.shp")
+cooling_effective_UGS <- st_read("data/cooling_effective_UGS/cooling_effective_UGS.shp") %>%
+  st_transform(.,27700)
 ```
 
-## 1.
+**OS Open Greenspace Access Points**
 
 ```{r}
-# Column names
+greenspace_access_points <- st_read("data/raw_data/OS-Open-Greenspace-GB/GB_AccessPoint/GB_AccessPoint.shp") 
+```
+
+## Data Wrangling
+
+```{r}
+# check column names
 names(cooling_effective_UGS)
+```
+
+### Filter Function of Cooling Effective UGS
+
++-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Literature Support                | Reason                                                                                                                                                                                                                                         |
++===================================+================================================================================================================================================================================================================================================+
+| Green Infrastructure Framework a  | 1.2 Accessible Green Infrastructure (AGI) defined accessible greenspace used in Version 2.2 of the Green Infrastructure Mapping: <https://designatedsites.naturalengland.org.uk/GreenInfrastructure/UserGuide/GreenInfrastructureModules.aspx> |
++-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Green Infrastructure Framework b  | Reasons (allotments and golf course): <https://designatedsites.naturalengland.org.uk/GreenInfrastructure/Glossary.aspx>                                                                                                                        |
++-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Smith et al. (2026)               | Greenspaces in the categories 'allotments or community growing spaces', 'other sports facility', 'tennis court', 'bowling green' and 'golf course' are removed                                                                                 |
+|                                   |                                                                                                                                                                                                                                                |
+|                                   | <https://www.sciencedirect.com/science/article/pii/S1618866725005552?__cf_chl_f_tk=kEs2lY5mgF92ex7FIa4v7E.LiQsjcC9.0QWhg03lBFk-1783176049-1.0.1.1-jCcO8_o0U3UK2CNrm0z8GHQdQ8xAGZDVW20H9a2L8.A>                                                 |
++-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+| Function |   | Reason | Support |
+|----|----|----|----|
+| Cemetery | Accessible, but No |  | Green Infrastructure Framework |
+| Golf Course | No | May require club membership and or payment of a fee to access (Green Infrastructure Framework b) | Green Infrastructure Framework, Smith et al. (2026) |
+| Other Sports Facility | No |  | Green Infrastructure Framework, Smith et al. (2026) |
+| Tennis Court | No |  | Green Infrastructure Framework, Smith et al. (2026) |
+| Religious Grounds | Accessible, but No |  | Green Infrastructure Framework |
+| Allotments or Community Growing Spaces | No | Normally locked and only accessible to key holders (Green Infrastructure Framework b) | Green Infrastructure Framework, Smith et al. (2026) |
+
+```{r}
+# select UGS function and needed columns
+cooling_effective_UGS_clean <- cooling_effective_UGS %>%
+  # select needed columns
+  select(id, functn_, geometry) %>%
+  # filter park functions to Public Park or Garden and Playing Field only
+  filter(functn_ %in% c("Public Park Or Garden", "Playing Field"))
+
+# check
+nrow(cooling_effective_UGS_clean)
+names(cooling_effective_UGS_clean)
+unique(cooling_effective_UGS_clean$functn_)
+```
+
+### Join Filtered Cooling Effective UGS with Access Points
+
+```{r}
+nrow(greenspace_access_points)
+names(greenspace_access_points)
+```
+
+```{r}
+# join 
+cooling_effective_access_points <- greenspace_access_points %>%
+  inner_join(
+    cooling_effective_UGS_clean %>%
+      st_drop_geometry() %>%
+      select(id, functn_),
+    by = c("refToGSite" = "id")
+  )
+```
+
+```{r}
+nrow(cooling_effective_access_points)
+```
+
+```{r}
+# Match CRS
+cooling_effective_access_points <- st_transform(
+  cooling_effective_access_points,
+  st_crs(cooling_effective_UGS_clean)
+)
+
+# Simple overlay check map
+access_point_check_map <- ggplot() +
+  geom_sf(
+    data = cooling_effective_UGS_clean,
+    fill = "grey85",
+    colour = "grey50",
+    linewidth = 0.2
+  ) +
+  geom_sf(
+    data = cooling_effective_access_points,
+    colour = "red",
+    size = 0.8,
+    alpha = 0.7
+  ) +
+  coord_sf(datum = NA) +
+  theme_void() +
+  theme(
+    plot.background = element_rect(fill = "white", colour = NA)
+  )
+
+access_point_check_map
 ```

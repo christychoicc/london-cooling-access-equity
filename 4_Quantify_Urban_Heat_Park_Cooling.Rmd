@@ -45,7 +45,8 @@ london_lst <- rast("data/London_LST_median.tif")
 **London LSOA LST and SUHII:**
 
 ```{r}
-lsoa_lst <- st_read("data/London_LSOA_LST_SUHI/London_LSOA_LST_SUHI.shp")
+lsoa_lst <- st_read("data/London_LSOA_LST_SUHI/London_LSOA_LST_SUHI.shp")%>% 
+  st_transform(.,27700)
 ```
 
 **Green Space \> 2ha:**
@@ -57,7 +58,8 @@ greenspace2ha <- st_read("data/greenspace_london_2ha/greenspace_london_2ha.shp")
 **Green Space and Green Space Buffer LST:**
 
 ```{r}
-greenspace <- st_read("data/greenspace_buffer_lst/greenspace_buffer_lst.shp")
+greenspace <- st_read("data/greenspace_buffer_lst/greenspace_buffer_lst.shp") %>% 
+  st_transform(.,27700)
 ```
 
 ## 1. Urban Heat
@@ -544,7 +546,7 @@ pci_map <- ggplot() +
   ) +
   geom_sf(
     data = greenspace_pci,
-    fill = "grey80",
+    aes(fill = "Other UGS"),
     colour = NA
   ) +
   geom_sf(
@@ -554,7 +556,11 @@ pci_map <- ggplot() +
   ) +
   scale_fill_manual(
     name = "PCI",
-    values = setNames(pci_blues, pci_labels),
+    values = c(
+      "Other UGS" = "grey80",
+      setNames(pci_blues, pci_labels)
+    ),
+    breaks = c("Other UGS", pci_labels),
     drop = FALSE
   ) +
   coord_sf(datum = NA) +
