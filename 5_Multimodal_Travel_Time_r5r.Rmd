@@ -22,6 +22,24 @@ library(tidyverse)
 
 ## Data Loading
 
+**Greater London Boundary**
+
+```{r}
+london_boundary <- st_read("data/raw_data/gla/London_london_boundary.shp")
+```
+
+**London LSOA Boundaries**
+
+```{r}
+london_lsoa <- st_read("data/lsoa_london/lsoa_london.shp")
+```
+
+**Green spaces \> 2ha**
+
+```{r}
+greenspace2ha <- st_read("data/greenspace_london_2ha/greenspace_london_2ha.shp")
+```
+
 **Cooling Effective UGS shp** (exported from 4_Quantify_Urban_Heat_Park_Cooling.Rmd)\_
 
 ```{r}
@@ -36,14 +54,53 @@ cooling_effective_UGS <- st_read("data/cooling_effective_UGS/cooling_effective_U
 greenspace_access_points <- st_read("data/raw_data/OS-Open-Greenspace-GB/GB_AccessPoint/GB_AccessPoint.shp") 
 ```
 
-## Data Wrangling
+**London LSOA Population Weighted Centroids**
+
+```{r}
+london_lsoa_pop_weighted_centroids <- st_read("data/london_lsoa_pop_weighted_centroids/london_lsoa_pop_weighted_centroids.shp")
+```
+
+## 1. Origins
+
+```{r}
+london_centroids_map <- ggplot() +
+  geom_sf(
+    data = london_boundary,
+    fill = "white",
+    colour = "grey30"
+  ) +
+  geom_sf(
+    data = london_lsoa,
+    fill = NA,
+    colour = "grey80",
+    linewidth = 0.1
+  ) +
+  geom_sf(
+    data = london_lsoa_pop_weighted_centroids,
+    shape = 21,        # circle with fill + border
+    fill = "#C96F57",
+    colour = "black",
+    stroke = 0.08,     # thin black border
+    size = 0.8,
+    alpha = 0.8
+  ) +
+  coord_sf(datum = NA) +
+  theme_void() +
+  theme(
+    plot.background = element_rect(fill = "white", colour = NA)
+  )
+
+london_centroids_map
+```
+
+## 2. Destinations
 
 ```{r}
 # check column names
 names(cooling_effective_UGS)
 ```
 
-### Filter Function of Cooling Effective UGS
+### 2.1. Filter Function of Cooling Effective UGS
 
 +-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Literature Support                | Reason                                                                                                                                                                                                                                         |
@@ -80,7 +137,7 @@ names(cooling_effective_UGS_clean)
 unique(cooling_effective_UGS_clean$functn_)
 ```
 
-### Join Filtered Cooling Effective UGS with Access Points
+### 2.2. Join Filtered Cooling Effective UGS with Access Points
 
 ```{r}
 nrow(greenspace_access_points)
@@ -102,26 +159,42 @@ cooling_effective_access_points <- greenspace_access_points %>%
 nrow(cooling_effective_access_points)
 ```
 
-```{r}
-# Match CRS
-cooling_effective_access_points <- st_transform(
-  cooling_effective_access_points,
-  st_crs(cooling_effective_UGS_clean)
-)
+**Map: Cooling Effective Greenspace Access Points**
 
-# Simple overlay check map
-access_point_check_map <- ggplot() +
+```{r}
+# ensure consist CRS
+london_boundary <- st_transform(london_boundary,st_crs(cooling_effective_UGS_clean))
+
+greenspace2ha <- st_transform(greenspace2ha,st_crs(cooling_effective_UGS_clean))
+
+cooling_effective_access_points <- st_transform(cooling_effective_access_points,st_crs(cooling_effective_UGS_clean))
+
+
+access_point_map <- ggplot() +
+  geom_sf(
+    data = london_boundary,
+    fill = "white",
+    colour = "grey30",
+    linewidth = 0.3
+  ) +
+  geom_sf(
+    data = greenspace2ha,
+    fill = "grey85",
+    colour = NA
+  ) +
   geom_sf(
     data = cooling_effective_UGS_clean,
-    fill = "grey85",
-    colour = "grey50",
-    linewidth = 0.2
+    fill = "#CFE8D5",
+    colour = NA
   ) +
   geom_sf(
     data = cooling_effective_access_points,
-    colour = "red",
+    shape = 25,           # upside-down triangle
+    fill = "#3B5E61",      # triangle fill
+    colour = "black",     # triangle border
+    stroke = 0.15,        # thin border
     size = 0.8,
-    alpha = 0.7
+    alpha = 0.9
   ) +
   coord_sf(datum = NA) +
   theme_void() +
@@ -129,5 +202,45 @@ access_point_check_map <- ggplot() +
     plot.background = element_rect(fill = "white", colour = NA)
   )
 
-access_point_check_map
+access_point_map
+```
+
+## 3. Origin and Destinations for Routing
+
+| Routing O-D  | Objects                            |
+|--------------|------------------------------------|
+| Origins      | cooling_effective_access_points    |
+| Destinations | london_lsoa_pop_weighted_centroids |
+
+**Map (a) Origins and (b) Destinations in one plot**
+
+```{r}
+origin_destination_map <- cowplot::plot_grid(
+  london_centroids_map,
+  access_point_map,
+  labels = c("a", "b"),
+  label_size = 14,
+  label_fontface = "bold",
+  label_x = c(0.03, 0.03),
+  label_y = c(0.74, 0.74),
+  hjust = 0,
+  vjust = 1,
+  ncol = 2,
+  align = "hv"
+)
+
+origin_destination_map
+```
+
+```{r}
+# save as PNG
+ggsave(
+  filename = "figures/Fig4_Origin_Destinations.png",
+  plot = origin_destination_map,
+  width = 11.69,
+  height = 8.27,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
 ```

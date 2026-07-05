@@ -17,7 +17,7 @@ library(dplyr)
 library(tmap)
 ```
 
-## 1. London LSOA Data 
+## 1. London LSOA Data
 
 ```{r}
 # LSOA for whole Great Britian
@@ -52,7 +52,7 @@ table(st_geometry_type(lsoa_london))
 qtm(lsoa_london)
 ```
 
-```{r}
+```{r, eval=FALSE}
 # Save as shapefile
 st_write(lsoa_london, "data/lsoa_london/lsoa_london.shp")
 ```
@@ -74,12 +74,12 @@ greenspace_london <- greenspace_gb %>%
 qtm(greenspace_london)
 ```
 
-```{r}
+```{r, eval=FALSE}
 # Save as shapefile
 st_write(greenspace_london, "data/greenspace_london/greenspace_london.shp")
 ```
 
-## 3. London Green Space Polygons \> 2ha 
+## 3. London Green Space Polygons \> 2ha
 
 ```{r}
 # Removed polygon sizes smaller than 2ha
@@ -95,6 +95,31 @@ greenspace_london_2ha <- greenspace_london %>%
 qtm(greenspace_london_2ha)
 ```
 
-```{r}
+```{r, eval=FALSE}
 st_write(greenspace_london_2ha, "data/greenspace_london_2ha/greenspace_london_2ha.shp")
+```
+
+## 4. London LSOA Population Weighted Centroids
+
+```{r}
+pop_weighted_centroids <- st_read("data/raw_data/LSOA_PopCentroids_EW_2021_V4_-7256415914866551835")
+```
+
+```{r}
+# use london boundary to filter
+# ensure consistent CRS
+pop_weighted_centroids <- st_transform(pop_weighted_centroids,st_crs(london_boundary))
+
+# filter pop centroids to London only
+london_pop_weighted_centroids <- pop_weighted_centroids %>% 
+  st_filter(london_boundary, .predicate = st_intersects)
+```
+
+```{r}
+# Check 
+nrow(london_pop_weighted_centroids)
+```
+
+```{r}
+st_write(london_pop_weighted_centroids, "data/london_lsoa_pop_weighted_centroids/london_lsoa_pop_weighted_centroids.shp")
 ```

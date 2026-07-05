@@ -64,6 +64,8 @@ data/lsoa_london*
 data/greenspace_london*
 # Greenspace London > 2ha
 data/greenspace_london_2ha*
+# London LSOA population weighted centroids
+data/london_lsoa_pop_weighted_centroids*
 
 # GEE files
 data/London_LSOA_LST_SUHI*
