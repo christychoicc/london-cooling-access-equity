@@ -33,7 +33,7 @@ library(RColorBrewer)
 **Greater London Boundary:**
 
 ```{r}
-london_boundary <- st_read("data/raw_data/gla/London_london_boundary.shp")
+london_boundary <- st_read("data/gla/London_london_boundary.shp")
 ```
 
 **London LST Raster:**

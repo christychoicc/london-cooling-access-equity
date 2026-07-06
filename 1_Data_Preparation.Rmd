@@ -129,6 +129,10 @@ st_write(london_pop_weighted_centroids, "data/london_lsoa_pop_weighted_centroids
 ## 5. Rail GTFS
 
 ```{r, eval=FALSE}
+remotes::install_github("ITSleeds/UK2GTFS")
+```
+
+```{r, eval=FALSE}
 # Data taken from National Rail Portal
 # Save username and password
 install.packages("usethis")
@@ -138,7 +142,6 @@ usethis::edit_r_environ()
 ```
 
 ```{r, eval=FALSE}
-# Restarted R session, so load this library again
 # Load the specific package for converting to GTFS
 library(UK2GTFS)
 

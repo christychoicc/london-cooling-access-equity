@@ -18,6 +18,7 @@ library(here)
 library(dplyr)
 library(ggplot2)
 library(tidyverse)
+library(tidytransit)
 ```
 
 ## Data Loading
@@ -25,7 +26,7 @@ library(tidyverse)
 **Greater London Boundary**
 
 ```{r}
-london_boundary <- st_read("data/raw_data/gla/London_london_boundary.shp")
+london_boundary <- st_read("data/gla/London_GLA_Boundary.shp")
 ```
 
 **London LSOA Boundaries**
@@ -65,15 +66,14 @@ london_lsoa_pop_weighted_centroids <- st_read("data/london_lsoa_pop_weighted_cen
 ```{r}
 london_centroids_map <- ggplot() +
   geom_sf(
-    data = london_boundary,
-    fill = "white",
-    colour = "grey30"
-  ) +
-  geom_sf(
     data = london_lsoa,
     fill = NA,
-    colour = "grey80",
-    linewidth = 0.1
+    colour = "grey80"
+  ) +
+  geom_sf(
+    data = london_boundary,
+    fill = NA,
+    colour = "grey30"
   ) +
   geom_sf(
     data = london_lsoa_pop_weighted_centroids,
@@ -102,26 +102,33 @@ names(cooling_effective_UGS)
 
 ### 2.1. Filter Function of Cooling Effective UGS
 
-+-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Literature Support                | Reason                                                                                                                                                                                                                                         |
-+===================================+================================================================================================================================================================================================================================================+
-| Green Infrastructure Framework a  | 1.2 Accessible Green Infrastructure (AGI) defined accessible greenspace used in Version 2.2 of the Green Infrastructure Mapping: <https://designatedsites.naturalengland.org.uk/GreenInfrastructure/UserGuide/GreenInfrastructureModules.aspx> |
-+-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Green Infrastructure Framework b  | Reasons (allotments and golf course): <https://designatedsites.naturalengland.org.uk/GreenInfrastructure/Glossary.aspx>                                                                                                                        |
-+-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Smith et al. (2026)               | Greenspaces in the categories 'allotments or community growing spaces', 'other sports facility', 'tennis court', 'bowling green' and 'golf course' are removed                                                                                 |
-|                                   |                                                                                                                                                                                                                                                |
-|                                   | <https://www.sciencedirect.com/science/article/pii/S1618866725005552?__cf_chl_f_tk=kEs2lY5mgF92ex7FIa4v7E.LiQsjcC9.0QWhg03lBFk-1783176049-1.0.1.1-jCcO8_o0U3UK2CNrm0z8GHQdQ8xAGZDVW20H9a2L8.A>                                                 |
-+-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Literature Support               | Reason                                                                                                                                                                                                                                         |
++==================================+================================================================================================================================================================================================================================================+
+| Green Infrastructure Framework a | 1.2 Accessible Green Infrastructure (AGI) defined accessible greenspace used in Version 2.2 of the Green Infrastructure Mapping: <https://designatedsites.naturalengland.org.uk/GreenInfrastructure/UserGuide/GreenInfrastructureModules.aspx> |
++----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Green Infrastructure Framework b | Reasons (allotments and golf course): <https://designatedsites.naturalengland.org.uk/GreenInfrastructure/Glossary.aspx>                                                                                                                        |
++----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Smith et al. (2026)              | Greenspaces in the categories 'allotments or community growing spaces', 'other sports facility', 'tennis court', 'bowling green' and 'golf course' are removed                                                                                 |
+|                                  |                                                                                                                                                                                                                                                |
+|                                  | <https://www.sciencedirect.com/science/article/pii/S1618866725005552?__cf_chl_f_tk=kEs2lY5mgF92ex7FIa4v7E.LiQsjcC9.0QWhg03lBFk-1783176049-1.0.1.1-jCcO8_o0U3UK2CNrm0z8GHQdQ8xAGZDVW20H9a2L8.A>                                                 |
++----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
-| Function |   | Reason | Support |
-|----|----|----|----|
-| Cemetery | Accessible, but No |  | Green Infrastructure Framework |
-| Golf Course | No | May require club membership and or payment of a fee to access (Green Infrastructure Framework b) | Green Infrastructure Framework, Smith et al. (2026) |
-| Other Sports Facility | No |  | Green Infrastructure Framework, Smith et al. (2026) |
-| Tennis Court | No |  | Green Infrastructure Framework, Smith et al. (2026) |
-| Religious Grounds | Accessible, but No |  | Green Infrastructure Framework |
-| Allotments or Community Growing Spaces | No | Normally locked and only accessible to key holders (Green Infrastructure Framework b) | Green Infrastructure Framework, Smith et al. (2026) |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
+| Function                               |                    | Reason                                                                                           | Support                                             |
++========================================+====================+==================================================================================================+=====================================================+
+| Cemetery                               | Accessible, but No |                                                                                                  | Green Infrastructure Framework                      |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
+| Golf Course                            | No                 | May require club membership and or payment of a fee to access (Green Infrastructure Framework b) | Green Infrastructure Framework, Smith et al. (2026) |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
+| Other Sports Facility                  | No                 |                                                                                                  | Green Infrastructure Framework, Smith et al. (2026) |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
+| Tennis Court                           | No                 |                                                                                                  | Green Infrastructure Framework, Smith et al. (2026) |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
+| Religious Grounds                      | Accessible, but No |                                                                                                  | Green Infrastructure Framework                      |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
+| Allotments or Community Growing Spaces | No                 | Normally locked and only accessible to key holders (Green Infrastructure Framework b)            | Green Infrastructure Framework, Smith et al. (2026) |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
 
 ```{r}
 # select UGS function and needed columns
@@ -174,8 +181,7 @@ access_point_map <- ggplot() +
   geom_sf(
     data = london_boundary,
     fill = "white",
-    colour = "grey30",
-    linewidth = 0.3
+    colour = "grey30"
   ) +
   geom_sf(
     data = greenspace2ha,
@@ -212,6 +218,19 @@ access_point_map
 | Origins      | cooling_effective_access_points    |
 | Destinations | london_lsoa_pop_weighted_centroids |
 
+```{r}
+# check column names now
+names(cooling_effective_access_points)
+names(london_lsoa_pop_weighted_centroids)
+```
+
+Save origins and destinations objects as RDS
+
+```{r}
+saveRDS(cooling_effective_access_points, "data/origins_destinations/origins.rds")
+saveRDS(london_lsoa_pop_weighted_centroids, "data/origins_destinations/destinations.rds")
+```
+
 **Map (a) Origins and (b) Destinations in one plot**
 
 ```{r}
@@ -221,12 +240,12 @@ origin_destination_map <- cowplot::plot_grid(
   labels = c("a", "b"),
   label_size = 14,
   label_fontface = "bold",
-  label_x = c(0.03, 0.03),
-  label_y = c(0.74, 0.74),
+  label_x = c(0.02, 0.02),
+  label_y = c(0.92, 0.92),
   hjust = 0,
   vjust = 1,
   ncol = 2,
-  align = "hv"
+  align = "h"
 )
 
 origin_destination_map
@@ -237,10 +256,199 @@ origin_destination_map
 ggsave(
   filename = "figures/Fig4_Origin_Destinations.png",
   plot = origin_destination_map,
-  width = 11.69,
-  height = 8.27,
+  width = 11.69, # keep A4 size width
+  height = 5.5,
   units = "in",
   dpi = 300,
   bg = "white"
 )
 ```
+
+## 4. r5r
+
+### 4.1. Data Loading for r5r
+
+```{r}
+# GTFS Bus Data
+gtfs_bus <- read_gtfs("data/r5r/itm_london_gtfs.zip")
+
+# GTFS Rail
+gtfs_rail <- read_gtfs("data/r5r/gtfs_rail.zip")
+```
+
+### 4.2. Data Checks
+
+**Check Bus Open Data Service GTFS**
+
+```{r}
+# Route types
+# 3 = bus, 1 = subway/tube, 2 = rail, 0 = tram
+table(gtfs_bus$routes$route_type)
+
+# Service providers (agency)
+unique(gtfs_bus$agency$agency_name)
+```
+
+**Check rail GTFS**
+
+```{r}
+# Check all agencies (providers)
+unique(gtfs_rail$agency$agency_name)
+```
+
+Check what TfL Rail Includes
+
+```{r}
+gtfs_rail$routes %>%
+  left_join(gtfs_rail$agency, by = "agency_id") %>%
+  filter(grepl("TfL Rail", agency_name)) %>%
+  select(route_short_name, route_long_name, route_type)
+
+# check lizzy line stops 
+gtfs_rail$stops %>%
+  filter(grepl("Abbey Wood|Shenfield|Paddington|Liverpool Street|Whitechapel|Canary Wharf|Custom House|Woolwich", stop_name, ignore.case = TRUE)) %>%
+  select(stop_name, stop_id) %>%
+  arrange(stop_name)
+
+# check number of trips TfL Rail operates
+gtfs_rail$trips %>%
+  left_join(gtfs_rail$routes, by = "route_id") %>%
+  left_join(gtfs_rail$agency, by = "agency_id") %>%
+  filter(grepl("TfL Rail", agency_name)) %>%
+  nrow()
+```
+
+**Check GTFS date ranges**
+
+```{r}
+# Check date ranges
+cat("Bus GTFS\n")
+cat("Start date:", as.character(min(gtfs_bus$calendar$start_date)), "\n")
+cat("End date:  ", as.character(max(gtfs_bus$calendar$end_date)), "\n")
+
+cat("\nRail GTFS\n")
+cat("Start date:", as.character(min(gtfs_rail$calendar$start_date)), "\n")
+cat("End date:  ", as.character(max(gtfs_rail$calendar$end_date)), "\n")
+```
+
+### 4.3. Build r5r network
+
+#### 4.3.1. r5r network setup
+
+Install Java Development Kit (JDK)
+
+```{r, eval=FALSE}
+install.packages('rJavaEnv')
+
+# check version of Java currently installed (if any) 
+rJavaEnv::java_check_version_rjava()
+
+# install Java 21
+rJavaEnv::java_quick_install(version = 21)
+```
+
+Load Origins and Destinations again:
+
+```{r}
+origins <- readRDS("data/origins_destinations/origins.rds")
+destinations <- readRDS("data/origins_destinations/destinations.rds")
+```
+
+```{r}
+# increase Java memory
+options(java.parameters = "-Xmx12G")
+
+# load libraries
+library(r5r)
+
+#path <- system.file("r5r_path", package = "r5r")
+r5r_core <- r5r::build_network(data_path = "data/r5r")
+
+# used setup_r5() previously and got the following: 
+# Warning: ! `setup_r5()` is being deprecated in *r5r* v2.3.0 and will be removed in a future release. ℹ Please use `r5r::build_network()` instead.
+```
+
+#### 4.3.2. Set Routing Parameters
+
++----------------------+------------------------------------------------------------------------------------------+
+| Parameters           | Link                                                                                     |
++======================+==========================================================================================+
+| Detailed Itineraries | <https://ipeagit.github.io/r5r/reference/detailed_itineraries.html>                      |
+|                      |                                                                                          |
+|                      | <https://www.rdocumentation.org/packages/r5r/versions/2.2.0/topics/detailed_itineraries> |
++----------------------+------------------------------------------------------------------------------------------+
+|                      |                                                                                          |
++----------------------+------------------------------------------------------------------------------------------+
+
+```{r}
+# maximum trip durations to be 1 hour (60 min)
+max_trip_duration60 <- 60 
+```
+
+```{r}
+# can change to just a day (no time) and it will return min time of the entire day 
+departure_datetime <- as.POSIXct("17-06-2026 12:00:00", 
+                                 format = "%d-%m-%Y %H:%M:%S",
+                                 tz = "Europe/London")
+```
+
+**Public Transit**
+
+```{r}
+# travel by (all kinds) public transport only
+mode_transit <- ("TRANSIT")
+
+# estimating the travel time
+TTM_PT <- travel_time_matrix(r5r_core,
+                             origins = origins,
+                            destinations = destinations,
+                            mode = mode_transit,
+                            departure_datetime = departure_datetime,
+                            max_trip_duration = max_trip_duration,
+                            time_window = 120,
+                            # percentile is set default for 50 (median) 
+                            # but still typed it out to be clear here
+                            percentiles = 50)
+                            # percentiles = c(25, 50, 75))
+```
+
+**Walk**
+
+```{r}
+# travel by walking only 
+mode_walk <- c("WALK")
+
+# estimating the travel time
+TTM_walk <- travel_time_matrix(r5r_core,
+                               origins = origins,
+                               destinations = destinations,
+                               mode = mode_walk,
+                               departure_datetime = departure_datetime,
+                               max_trip_duration = max_trip_duration,
+                               time_window = 120,
+                               percentiles = 50)
+```
+
+**Cycle**
+
+```{r}
+mode_cycle <- c("BICYCLE")
+
+# estimating the travel time
+TTM_cycle <- travel_time_matrix(r5r_core,
+                                origins = origins,
+                                destinations = destinations,
+                                mode = TTM_cycle,
+                                departure_datetime = departure_datetime,
+                                max_trip_duration = max_trip_duration,
+                                time_window = 120,
+                                percentiles = 50,
+                                # Bike speed (default is 12)
+                                bike_speed = 12,
+                                # Level of Stress (default is 2)
+                                max_lts = 2)
+```
+
+### 4.3. Minimum Travel Time
+
+### 4.4. Filter Travel Time to 15 min, 30 min and 60 min

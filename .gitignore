@@ -56,6 +56,12 @@ data/raw_data/Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BFC_V10
 data/raw_data/LSOA_PopCentroids_EW_2021_V4_-7256415914866551835*
 # Greenspace access points and polygons
 data/raw_data/OS-Open-Greenspace-GB*
+# rail timetable zip
+data/raw_data/timetable.zip*
+
+# java
+rjavaenv*
+.Rprofile
 
 # pre-filtered files:
 # London LSOA
@@ -75,4 +81,4 @@ data/greenspace_buffer_LST*
 data/cooling_effective_UGS*
 
 # r5r data: 
-data/r5r*
+data/r5r*rjavaenv/

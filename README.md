@@ -36,7 +36,8 @@ london-cooling-access-equity/
 |   ├── Fig1_Mean_LST_Greenspace_2ha_map.png
 |   ├── Fig2_LSOA_SUHII.png
 |   ├── Fig3_Cooling_Effective_UGS_PCI_map.png
-|   └── Fig4_
+|   ├── Fig4_Origin_Destinations.png
+|   └── 
 ```
 
 ## Data Availability
@@ -48,6 +49,7 @@ After downloading, place it in the project directory using the following structu
 ```
 data/
 ├── raw_data/                                     # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 
+├── gla/
 ├── lsoa_london/                                  # LSOA boundary shapefile filtered to London only (large file - gitignored)
 ├── London_LSOA_LST_SUHI/                          # LST and SUHII data retreived from Google Earth Engine (large file - gitignored)
 ├── London_LST_median.tif                         # Median LST raster data for Greater London retreived from Google Earth Engine
@@ -55,6 +57,7 @@ data/
 ├── greenspace_london_2ha/                        # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
 ├── greenspace_buffer_LST/                        # Green space LST and Green space Buffer LST (30m, 0-900m) retreived from Google Earth Engine (large file - gitignored)
 ├── cooling_effective_UGS/
+├── london_lsoa_pop_weighted_centroids/
 └── r5r/                                          # Data folder for r5r (large file - gitignored)
 |   ├── greater-london-260414.osm.pbf             # Road network data
 |   ├── gtfs_rail.zip                             # Rail GTFS data
