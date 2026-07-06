@@ -405,7 +405,7 @@ TTM_PT <- travel_time_matrix(r5r_core,
                              mode = mode_transit,
                              departure_datetime = departure_datetime,
                              max_trip_duration = max_trip_duration,
-                             time_window = 120,
+                             time_window = 60,
                              # percentile is set default for 50 (median) 
                              # but still typed it out to be clear here
                              percentiles = 50)
@@ -425,7 +425,7 @@ TTM_walk <- travel_time_matrix(r5r_core,
                                mode = mode_walk,
                                departure_datetime = departure_datetime,
                                max_trip_duration = max_trip_duration,
-                               time_window = 120,
+                               time_window = 60,
                                percentiles = 50)
 ```
 
@@ -441,7 +441,7 @@ TTM_cycle <- travel_time_matrix(r5r_core,
                                 mode = TTM_cycle,
                                 departure_datetime = departure_datetime,
                                 max_trip_duration = max_trip_duration,
-                                time_window = 120,
+                                time_window = 60,
                                 percentiles = 50,
                                 # Bike speed (default is 12)
                                 bike_speed = 12,
