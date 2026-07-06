@@ -227,8 +227,8 @@ names(london_lsoa_pop_weighted_centroids)
 Save origins and destinations objects as RDS
 
 ```{r}
-saveRDS(cooling_effective_access_points, "data/origins_destinations/origins.rds")
-saveRDS(london_lsoa_pop_weighted_centroids, "data/origins_destinations/destinations.rds")
+saveRDS(london_lsoa_pop_weighted_centroids, "data/origins_destinations/origins.rds")
+saveRDS(cooling_effective_access_points, "data/origins_destinations/destinations.rds")
 ```
 
 **Map (a) Origins and (b) Destinations in one plot**
@@ -371,23 +371,23 @@ r5r_core <- r5r::build_network(data_path = "data/r5r")
 #### 4.3.2. Set Routing Parameters
 
 +----------------------+------------------------------------------------------------------------------------------+
-| Parameters           | Link                                                                                     |
+| Arguements           | Link                                                                                     |
 +======================+==========================================================================================+
 | Detailed Itineraries | <https://ipeagit.github.io/r5r/reference/detailed_itineraries.html>                      |
 |                      |                                                                                          |
 |                      | <https://www.rdocumentation.org/packages/r5r/versions/2.2.0/topics/detailed_itineraries> |
 +----------------------+------------------------------------------------------------------------------------------+
-|                      |                                                                                          |
-+----------------------+------------------------------------------------------------------------------------------+
 
 ```{r}
 # maximum trip durations to be 1 hour (60 min)
+# later filter for 15, 30, 60
 max_trip_duration60 <- 60 
 ```
 
 ```{r}
-# can change to just a day (no time) and it will return min time of the entire day 
-departure_datetime <- as.POSIXct("17-06-2026 12:00:00", 
+# can change to just a day (no time) and it will return min time of the entire day
+# 01/07/2026 no strike no abnormal events
+departure_datetime <- as.POSIXct("01-07-2026 12:00:00", 
                                  format = "%d-%m-%Y %H:%M:%S",
                                  tz = "Europe/London")
 ```
@@ -395,21 +395,21 @@ departure_datetime <- as.POSIXct("17-06-2026 12:00:00",
 **Public Transit**
 
 ```{r}
-# travel by (all kinds) public transport only
+# travel by (all kinds) public transport available
 mode_transit <- ("TRANSIT")
 
 # estimating the travel time
 TTM_PT <- travel_time_matrix(r5r_core,
                              origins = origins,
-                            destinations = destinations,
-                            mode = mode_transit,
-                            departure_datetime = departure_datetime,
-                            max_trip_duration = max_trip_duration,
-                            time_window = 120,
-                            # percentile is set default for 50 (median) 
-                            # but still typed it out to be clear here
-                            percentiles = 50)
-                            # percentiles = c(25, 50, 75))
+                             destinations = destinations,
+                             mode = mode_transit,
+                             departure_datetime = departure_datetime,
+                             max_trip_duration = max_trip_duration,
+                             time_window = 120,
+                             # percentile is set default for 50 (median) 
+                             # but still typed it out to be clear here
+                             percentiles = 50)
+                             # percentiles = c(25, 50, 75))
 ```
 
 **Walk**
@@ -451,4 +451,8 @@ TTM_cycle <- travel_time_matrix(r5r_core,
 
 ### 4.3. Minimum Travel Time
 
-### 4.4. Filter Travel Time to 15 min, 30 min and 60 min
+### 4.4. Filter Travel Time for 15 min, 30 min and 60 min
+
+```{r}
+
+```

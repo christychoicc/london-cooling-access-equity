@@ -19,8 +19,6 @@
 |Socioeconomic data|Indicies of Multiple Depriviation (IMD 2025)|LSOA-level deprivation indicies for England|[View Link](https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025)|Socioeconomic vulnerability and compare accessibility to cool greenspace across more/ less deprived neighbourhoods|
 |Socioeconomic data|Census Data||||
 
-## Methodology
-
 
 ## Repository Structure
 ```
@@ -58,6 +56,7 @@ data/
 ├── greenspace_buffer_LST/                        # Green space LST and Green space Buffer LST (30m, 0-900m) retreived from Google Earth Engine (large file - gitignored)
 ├── cooling_effective_UGS/
 ├── london_lsoa_pop_weighted_centroids/
+├── origins_destinations/
 └── r5r/                                          # Data folder for r5r (large file - gitignored)
 |   ├── greater-london-260414.osm.pbf             # Road network data
 |   ├── gtfs_rail.zip                             # Rail GTFS data
