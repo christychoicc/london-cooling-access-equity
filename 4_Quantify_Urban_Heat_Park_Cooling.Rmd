@@ -127,7 +127,7 @@ lst_map
 ```{r}
 # save as png
 ggsave(
-  filename = "figures/Fig1_Mean_LST_Greenspace_2ha_map.png",
+  filename = "figures/Fig2_Mean_LST_Greenspace_2ha_map.png",
   plot = lst_map,
   width = 11.69,
   height = 8.27,
@@ -247,7 +247,7 @@ suhii_tm
 ```{r}
 # save as png
 ggsave(
-  "figures/Fig2_LSOA_SUHII.png",
+  "figures/Fig3_LSOA_SUHII.png",
   plot = suhii_tm,
   width = 11.69,
   height = 8.27,
@@ -707,7 +707,7 @@ pci_map
 ```{r}
 # save as PNG
 ggsave(
-  filename = "figures/Fig3_Cooling_Effective_UGS_PCI_map.png",
+  filename = "figures/Fig4_Cooling_Effective_UGS_PCI_map.png",
   plot = pci_map,
   width = 11.69,
   height = 8.27,
