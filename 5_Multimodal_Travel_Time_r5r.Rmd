@@ -579,7 +579,7 @@ for (f in feeds) {
     gtfs$transfers <- gtfs$transfers[
       from_stop_id %in% valid_stops & to_stop_id %in% valid_stops
     ]
-    #rewrite a removed error zip file
+    #rewrite a removed error new zip file
     fixed_name <- sub("\\.zip$", "_fixed.zip", f)
     write_gtfs(gtfs, fixed_name)
     message("  wrote ", basename(fixed_name))
@@ -589,12 +589,13 @@ for (f in feeds) {
 
 ```{r}
 # move the old zip out of r5r folder
-dir.create("data/gtfs_originals", showWarnings = FALSE)
-file.rename("data/r5r/gtfs_rail.zip", "data/gtfs_originals/gtfs_rail.zip")
+file.rename("data/r5r/gtfs_rail.zip", "data/raw_data/r5r_raw/gtfs_rail.zip")
 
 # remove any leftovers from the failed build
 file.remove(list.files("data/r5r", pattern = "network.dat|mapdb", full.names = TRUE))
+```
 
+```{r}
 # rebuild
 r5r_core <- r5r::build_network(data_path = "data/r5r")
 ```
@@ -636,7 +637,7 @@ for (f in feeds) {
 
 ```{r}
 # move the error2 rail feed to outside gtfs_original file
-file.rename("data/r5r/gtfs_rail_fixed.zip", "data/gtfs_originals/gtfs_rail_fixed.zip")
+file.rename("data/r5r/gtfs_rail_fixed.zip", "data/raw_data/r5r_raw/gtfs_rail_fixed.zip")
 
 # clear caches and debris from previous attempts
 file.remove(list.files("data/r5r", pattern = "mapdb|gtfs_errors|r5r-log|network.dat", full.names = TRUE))
@@ -1040,4 +1041,4 @@ nrow(london_lsoa_ttm)
 st_write(london_lsoa_ttm,"data/multimodal_travel_time_lsoa/multimodal_travel_time_lsoa.gpkg", delete_dsn = TRUE)
 ```
 
-###  
+### 

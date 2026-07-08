@@ -76,6 +76,7 @@ data/london_lsoa_pop_weighted_centroids*
 data/r5r_v2.3.1_TTM*
 data/gtfs_originals*
 data/r5r_TTM*
+data/raw_data/r5r_raw
 # geopackage and csv
 data/multimodal_travel_time_lsoa*
 
