@@ -19,6 +19,7 @@ library(dplyr)
 library(ggplot2)
 library(tidyverse)
 library(tidytransit)
+library(gtfstools)
 ```
 
 ## Data Loading
@@ -164,16 +165,24 @@ names(cooling_effective_UGS)
 |                                  | <https://www.sciencedirect.com/science/article/pii/S1618866725005552?__cf_chl_f_tk=kEs2lY5mgF92ex7FIa4v7E.LiQsjcC9.0QWhg03lBFk-1783176049-1.0.1.1-jCcO8_o0U3UK2CNrm0z8GHQdQ8xAGZDVW20H9a2L8.A>                                                 |
 +----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
-| Function |   | Reason | Support |
-|----|----|----|----|
-| Cemetery | Accessible, but No |  | Green Infrastructure Framework |
-| Golf Course | No | May require club membership and or payment of a fee to access (Green Infrastructure Framework b) | Green Infrastructure Framework, Smith et al. (2026) |
-| Other Sports Facility | No |  | Green Infrastructure Framework, Smith et al. (2026) |
-| Tennis Court | No |  | Green Infrastructure Framework, Smith et al. (2026) |
-| Religious Grounds | Accessible, but No |  | Green Infrastructure Framework |
-| Allotments or Community Growing Spaces | No | Normally locked and only accessible to key holders (Green Infrastructure Framework b) | Green Infrastructure Framework, Smith et al. (2026) |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
+| Function                               |                    | Reason                                                                                           | Support                                             |
++========================================+====================+==================================================================================================+=====================================================+
+| Cemetery                               | Accessible, but No |                                                                                                  | Green Infrastructure Framework                      |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
+| Golf Course                            | No                 | May require club membership and or payment of a fee to access (Green Infrastructure Framework b) | Green Infrastructure Framework, Smith et al. (2026) |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
+| Other Sports Facility                  | No                 |                                                                                                  | Green Infrastructure Framework, Smith et al. (2026) |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
+| Tennis Court                           | No                 |                                                                                                  | Green Infrastructure Framework, Smith et al. (2026) |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
+| Religious Grounds                      | Accessible, but No |                                                                                                  | Green Infrastructure Framework                      |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
+| Allotments or Community Growing Spaces | No                 | Normally locked and only accessible to key holders (Green Infrastructure Framework b)            | Green Infrastructure Framework, Smith et al. (2026) |
++----------------------------------------+--------------------+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+
 
 ```{r}
+
 # select UGS function and needed columns
 cooling_effective_UGS_clean <- cooling_effective_UGS %>%
   # select needed columns
@@ -492,17 +501,33 @@ Install Java Development Kit (JDK)
 #rJavaEnv::java_quick_install(version = 21)
 ```
 
-Check Java Environment
+**Check Java Environment**
 
 ```{r}
+library(rJavaEnv)
 rJavaEnv::java_check_version_rjava()
 ```
 
-Load Origins and Destinations again:
+**Load Origins and Destinations again:**
 
 ```{r}
-origins <- readRDS("data/origins_destinations/origins.rds")
-destinations <- readRDS("data/origins_destinations/destinations.rds")
+origins1 <- readRDS("data/origins_destinations/origins.rds")
+destinations1 <- readRDS("data/origins_destinations/destinations.rds")
+```
+
+```{r}
+# check again after loading the saved RDS
+nrow(origins1)
+nrow(destinations1)
+```
+
+#### 5.3.2. r5r network
+
+(this part can be skipped after creating the r5r network folder once)
+
+```{r}
+# check package version
+packageVersion("r5r")
 ```
 
 ```{r}
@@ -519,7 +544,114 @@ r5r_core <- r5r::build_network(data_path = "data/r5r")
 # Warning: ! `setup_r5()` is being deprecated in *r5r* v2.3.0 and will be removed in a future release. ℹ Please use `r5r::build_network()` instead.
 ```
 
-#### 5.3.2. Set Routing Parameters
+```{r}
+# Error message: 
+
+#Error in `r5r::build_network()`:
+#✖ High priority GTFS errors found; network build failed.
+#ℹ Use `r5r::get_gtfs_errors()` to see them, or review data/r5r/gtfs_errors.csv.
+#Run `rlang::last_trace()` to see where the error occurred.
+```
+
+```{r}
+# check what the error is 
+r5r::get_gtfs_errors(data_path)
+
+head(r5r::get_gtfs_errors(data_path), 20)
+```
+
+```{r}
+# check which GTFS errored
+# create a fixed gtfs rail zip --> named : gtfs_rail_fixed
+feeds <- c("data/r5r/gtfs_rail.zip", "data/r5r/itm_london_gtfs.zip")  
+
+for (f in feeds) {
+  gtfs <- read_gtfs(f)
+
+  if (is.null(gtfs$transfers)) {
+    message(basename(f), ": no transfers.txt, nothing to fix")
+    next
+  }
+
+  valid_stops <- gtfs$stops$stop_id
+  bad <- gtfs$transfers[
+    !(from_stop_id %in% valid_stops) | !(to_stop_id %in% valid_stops)
+  ]
+  message(basename(f), ": ", nrow(bad), " broken transfer rows")
+
+  if (nrow(bad) > 0) {
+    gtfs$transfers <- gtfs$transfers[
+      from_stop_id %in% valid_stops & to_stop_id %in% valid_stops
+    ]
+    #rewrite a removed error zip file
+    fixed_name <- sub("\\.zip$", "_fixed.zip", f)
+    write_gtfs(gtfs, fixed_name)
+    message("  wrote ", basename(fixed_name))
+  }
+}
+```
+
+```{r}
+# move the old zip out of r5r folder
+dir.create("data/gtfs_originals", showWarnings = FALSE)
+file.rename("data/r5r/gtfs_rail.zip", "data/gtfs_originals/gtfs_rail.zip")
+
+# remove any leftovers from the failed build
+file.remove(list.files("data/r5r", pattern = "network.dat|mapdb", full.names = TRUE))
+
+# rebuild
+r5r_core <- r5r::build_network(data_path = "data/r5r")
+```
+
+```{r}
+# error again
+#Error in `r5r::build_network()`:
+#✖ High priority GTFS errors found; network build failed.
+#ℹ Use `r5r::get_gtfs_errors()` to see them, or review data/r5r/gtfs_errors.csv.
+#Run `rlang::last_trace()` to see where the error occurred.
+```
+
+```{r}
+#check again where is the error
+list.files("data/r5r")
+
+errors <- r5r::get_gtfs_errors("data/r5r")
+errors[errors$priority == "HIGH", ]
+```
+
+```{r}
+feeds <- c("data/r5r/gtfs_rail_fixed.zip", "data/r5r/itm_london_gtfs.zip")
+
+for (f in feeds) {
+  gtfs <- read_gtfs(f)
+  valid_stops <- gtfs$stops$stop_id
+
+  bad_trips <- unique(gtfs$stop_times[!(stop_id %in% valid_stops)]$trip_id)
+  message(basename(f), ": ", length(bad_trips), " trips reference missing stops")
+
+  if (length(bad_trips) > 0) {
+    gtfs <- filter_by_trip_id(gtfs, bad_trips, keep = FALSE)
+    fixed_name <- sub("\\.zip$", "_fix2.zip", f)
+    write_gtfs(gtfs, fixed_name)
+    message("  wrote ", basename(fixed_name))
+  }
+}
+```
+
+```{r}
+# move the error2 rail feed to outside gtfs_original file
+file.rename("data/r5r/gtfs_rail_fixed.zip", "data/gtfs_originals/gtfs_rail_fixed.zip")
+
+# clear caches and debris from previous attempts
+file.remove(list.files("data/r5r", pattern = "mapdb|gtfs_errors|r5r-log|network.dat", full.names = TRUE))
+```
+
+```{r}
+# buld r5r network again
+r5r_core <- r5r::build_network(data_path = "data/r5r")
+```
+
+#### 5.3.3. Calculate Travel Time
 
 +----------------------+------------------------------------------------------------------------------------------+
 | Arguements           | Link                                                                                     |
@@ -530,6 +662,17 @@ r5r_core <- r5r::build_network(data_path = "data/r5r")
 +----------------------+------------------------------------------------------------------------------------------+
 
 ```{r}
+# increase Java memory
+options(java.parameters = "-Xmx12G")
+
+# load library again
+library(r5r)
+
+# build network again
+r5r_core <- r5r::build_network(data_path = "data/r5r")
+```
+
+```{r}
 # maximum trip durations
 max_trip_duration120 <- 120 
 ```
@@ -537,7 +680,7 @@ max_trip_duration120 <- 120
 ```{r}
 # can change to just a day (no time) and it will return min time of the entire day
 # 01/07/2026 no strike no abnormal events
-departure_datetime <- as.POSIXct("01-07-2026 07:00:00", 
+departure_datetime <- as.POSIXct("07-07-2026 07:00:00", 
                                  format = "%d-%m-%Y %H:%M:%S",
                                  tz = "Europe/London")
 ```
@@ -550,8 +693,8 @@ mode_transit <- ("TRANSIT")
 
 # estimating the travel time
 TTM_PT <- travel_time_matrix(r5r_core,
-                             origins = origins,
-                             destinations = destinations,
+                             origins = origins1,
+                             destinations = destinations1,
                              mode = mode_transit,
                              departure_datetime = departure_datetime,
                              max_trip_duration = max_trip_duration120,
@@ -559,6 +702,11 @@ TTM_PT <- travel_time_matrix(r5r_core,
                              max_rides = 3,
                              # percentile (default is 50) 
                              percentiles = 50)
+```
+
+```{r}
+nrow(TTM_PT)
+head(TTM_PT)
 ```
 
 **Walk**
@@ -569,14 +717,19 @@ mode_walk <- c("WALK")
 
 # estimating the travel time
 TTM_walk <- travel_time_matrix(r5r_core,
-                               origins = origins,
-                               destinations = destinations,
+                               origins = origins1,
+                               destinations = destinations1,
                                mode = mode_walk,
                                departure_datetime = departure_datetime,
                                max_trip_duration = max_trip_duration120,
-                               time_window = 60,
+                               time_window = 180,
                                walk_speed = 5.15,
                                percentiles = 50)
+```
+
+```{r}
+nrow(TTM_walk)
+head(TTM_walk)
 ```
 
 **Cycle**
@@ -586,12 +739,12 @@ mode_cycle <- c("BICYCLE")
 
 # estimating the travel time
 TTM_cycle <- travel_time_matrix(r5r_core,
-                                origins = origins,
-                                destinations = destinations,
-                                mode = TTM_cycle,
+                                origins = origins1,
+                                destinations = destinations1,
+                                mode = mode_cycle,
                                 departure_datetime = departure_datetime,
                                 max_trip_duration = max_trip_duration120,
-                                time_window = 60,
+                                time_window = 180,
                                 percentiles = 50,
                                 # Bike speed (default is 12)
                                 bike_speed = 12,
@@ -599,7 +752,55 @@ TTM_cycle <- travel_time_matrix(r5r_core,
                                 max_lts = 2)
 ```
 
+```{r}
+nrow(TTM_cycle)
+head(TTM_cycle)
+```
+
+**Save raw TTM objects as RDS**
+
+```{r}
+# save as RDS
+saveRDS(TTM_PT, "data/r5r_TTM/r5r_TTM_PT_raw.rds")
+saveRDS(TTM_walk, "data/r5r_TTM/r5r_TTM_walk_raw.rds")
+saveRDS(TTM_cycle, "data/r5r_TTM/r5r_TTM_cycle_raw.rds")
+```
+
 ### 5.3. Minimum Travel Time
+
+Load the TTM objects
+
+```{r}
+TTM_PT <- readRDS("data/r5r_TTM/r5r_TTM_PT_raw.rds")
+TTM_walk <- readRDS("data/r5r_TTM/r5r_TTM_walk_raw.rds")
+TTM_cycle <- readRDS("data/r5r_TTM/r5r_TTM_cycle_raw.rds")
+```
+
+Select minimum value between pairs
+
+```{r}
+# public transit
+TTM_PT_min <- TTM_PT %>%
+  group_by(to_id, from_id) %>% 
+  slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
+  ungroup()
+```
+
+```{r}
+# walk
+TTM_walk_min <- TTM_walk %>%
+  group_by(to_id, from_id) %>% 
+  slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
+  ungroup()
+```
+
+```{r}
+# cycle
+TTM_cycle_min <- TTM_cycle %>%
+  group_by(to_id, from_id) %>% 
+  slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
+  ungroup()
+```
 
 ### 5.4. Filter Travel Time for 15 min, 30 min and 60 min
 
