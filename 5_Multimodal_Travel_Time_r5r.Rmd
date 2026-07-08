@@ -420,7 +420,7 @@ ggsave(
 
 ## 5. r5r
 
-### 5.1. Data Loading for r5r
+### 5.1. GTFS Data Checks
 
 ```{r}
 # GTFS Bus Data
@@ -429,8 +429,6 @@ gtfs_bus <- read_gtfs("data/r5r/itm_london_gtfs.zip")
 # GTFS Rail
 gtfs_rail <- read_gtfs("data/r5r/gtfs_rail.zip")
 ```
-
-### 5.2. Data Checks
 
 **Check Bus Open Data Service GTFS**
 
@@ -485,11 +483,9 @@ cat("Start date:", as.character(min(gtfs_rail$calendar$start_date)), "\n")
 cat("End date:  ", as.character(max(gtfs_rail$calendar$end_date)), "\n")
 ```
 
-### 5.3. Build r5r network
+### 5.2. Build r5r network
 
-#### 5.3.1. r5r network setup
-
-Install Java Development Kit (JDK)
+#### 5.2.1. r5r network setup
 
 ```{r, eval=FALSE}
 #install.packages('rJavaEnv')
@@ -508,7 +504,7 @@ library(rJavaEnv)
 rJavaEnv::java_check_version_rjava()
 ```
 
-**Load Origins and Destinations again:**
+**Read in Origins and Destinations again:**
 
 ```{r}
 origins1 <- readRDS("data/origins_destinations/origins.rds")
@@ -521,7 +517,7 @@ nrow(origins1)
 nrow(destinations1)
 ```
 
-#### 5.3.2. r5r network
+#### 5.2.2. r5r network
 
 (this part can be skipped after creating the r5r network folder once)
 
@@ -651,7 +647,7 @@ file.remove(list.files("data/r5r", pattern = "mapdb|gtfs_errors|r5r-log|network.
 r5r_core <- r5r::build_network(data_path = "data/r5r")
 ```
 
-#### 5.3.3. Calculate Travel Time
+#### 5.2.3. Calculate Travel Time
 
 +----------------------+------------------------------------------------------------------------------------------+
 | Arguements           | Link                                                                                     |
@@ -709,6 +705,11 @@ nrow(TTM_PT)
 head(TTM_PT)
 ```
 
+```{r}
+# save RDS
+saveRDS(TTM_PT, "data/r5r_TTM/r5r_TTM_PT_raw.rds")
+```
+
 **Walk**
 
 ```{r}
@@ -730,6 +731,11 @@ TTM_walk <- travel_time_matrix(r5r_core,
 ```{r}
 nrow(TTM_walk)
 head(TTM_walk)
+```
+
+```{r}
+# save as RDS
+saveRDS(TTM_walk, "data/r5r_TTM/r5r_TTM_walk_raw.rds")
 ```
 
 **Cycle**
@@ -757,16 +763,27 @@ nrow(TTM_cycle)
 head(TTM_cycle)
 ```
 
-**Save raw TTM objects as RDS**
-
 ```{r}
 # save as RDS
-saveRDS(TTM_PT, "data/r5r_TTM/r5r_TTM_PT_raw.rds")
-saveRDS(TTM_walk, "data/r5r_TTM/r5r_TTM_walk_raw.rds")
 saveRDS(TTM_cycle, "data/r5r_TTM/r5r_TTM_cycle_raw.rds")
 ```
 
+```{r}
+nrow(TTM_PT)
+nrow(TTM_walk)
+nrow(TTM_cycle)
+```
+
+```         
+Pairs of O-D
+PT = 20023385 
+Walking = 3497514 
+Cycling = 8288685
+```
+
 ### 5.3. Minimum Travel Time
+
+(returned the same, can skip)
 
 Load the TTM objects
 
@@ -776,34 +793,251 @@ TTM_walk <- readRDS("data/r5r_TTM/r5r_TTM_walk_raw.rds")
 TTM_cycle <- readRDS("data/r5r_TTM/r5r_TTM_cycle_raw.rds")
 ```
 
-Select minimum value between pairs
+**Select minimum value between pairs**
 
 ```{r}
 # public transit
-TTM_PT_min <- TTM_PT %>%
-  group_by(to_id, from_id) %>% 
+TTM_PT_min_pairs <- TTM_PT %>%
+  group_by(from_id, to_id) %>% 
   slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
   ungroup()
 ```
 
 ```{r}
 # walk
-TTM_walk_min <- TTM_walk %>%
-  group_by(to_id, from_id) %>% 
+TTM_walk_min_pairs <- TTM_walk %>%
+  group_by(from_id, to_id) %>% 
   slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
   ungroup()
 ```
 
 ```{r}
 # cycle
-TTM_cycle_min <- TTM_cycle %>%
-  group_by(to_id, from_id) %>% 
+TTM_cycle_min_pairs <- TTM_cycle %>%
+  group_by(from_id, to_id) %>% 
   slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
   ungroup()
 ```
 
-### 5.4. Filter Travel Time for 15 min, 30 min and 60 min
+```{r}
+# already checked nrows have the same (not changed)
+# check
+head(TTM_PT_min_pairs)
+head(TTM_walk_min_pairs)
+head(TTM_cycle_min_pairs)
+```
+
+### 5.4. Filter Minimum Travel Time for the nearest cooling effective UGS and for 15 min, 30 min and 60 min
 
 ```{r}
-
+TTM_PT_access <- TTM_PT_min_pairs %>%
+  group_by(from_id) %>%
+  slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
+  ungroup() %>%
+  rename(
+    nearest_access_point_PT = to_id,
+    travel_time_min_PT = travel_time_p50
+  ) %>%
+  mutate(
+    access_15_PT = travel_time_min_PT <= 15,
+    access_30_PT = travel_time_min_PT <= 30,
+    access_60_PT = travel_time_min_PT <= 60
+  )
 ```
+
+```{r}
+TTM_walking_access <- TTM_walk_min_pairs %>%
+  group_by(from_id) %>%
+  slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
+  ungroup() %>%
+  rename(
+    nearest_access_point_walking = to_id,
+    travel_time_min_walking = travel_time_p50
+  ) %>%
+  mutate(
+    access_15_walking = travel_time_min_walking <= 15,
+    access_30_walking = travel_time_min_walking <= 30,
+    access_60_walking = travel_time_min_walking <= 60
+  )
+```
+
+```{r}
+TTM_cycle_access <- TTM_cycle_min_pairs %>%
+  group_by(from_id) %>%
+  slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
+  ungroup() %>%
+  rename(
+    nearest_access_point_cycling = to_id,
+    travel_time_min_cycling = travel_time_p50
+  ) %>%
+  mutate(
+    access_15_cycling = travel_time_min_cycling <= 15,
+    access_30_cycling = travel_time_min_cycling <= 30,
+    access_60_cycling = travel_time_min_cycling <= 60
+  )
+```
+
+```{r}
+saveRDS(TTM_PT_access, "data/r5r_TTM/TTM_PT_access.rds")
+saveRDS(TTM_walking_access, "data/r5r_TTM/TTM_walking_access.rds")
+saveRDS(TTM_cycle_access, "data/r5r_TTM/TTM_cycle_access.rds")
+```
+
+```{r}
+# check 
+head(TTM_PT_access)
+head(TTM_walking_access)
+head(TTM_cycle_access)
+```
+
+```{r}
+# check
+nrow(TTM_PT_access)
+nrow(TTM_walking_access)
+nrow(TTM_cycle_access)
+```
+
+Ok, some LSOAs are missing, 1 missing each for PT and walking amd 3 missing for cycling, maybe because no routing available within our set max_trip_duration ... etc.
+
+Find which LSOAs are missing:
+
+```{r}
+# get original lsoas from origins
+original_lsoas <- origins %>%
+  st_drop_geometry() %>%
+  transmute(from_id = id)
+
+# check what missing from PT
+missing_PT <- original_lsoas %>%
+  anti_join(TTM_PT_access %>% distinct(from_id), by = "from_id")
+
+# check what missing from walking
+missing_walk <- original_lsoas %>%
+  anti_join(TTM_walking_access %>% distinct(from_id), by = "from_id")
+
+# check what missing from cycling
+missing_cycle <- original_lsoas %>%
+  anti_join(TTM_cycle_access %>% distinct(from_id), by = "from_id")
+
+missing_PT
+missing_walk
+missing_cycle
+```
+
+Missing LSOA in PT: E01002482
+
+Missing LSOA in Walking: E01002482
+
+Missing LSOAs in Cycling: E01033929, E01032783, E01002482
+
+```{r}
+# check if this is missing from beginning of r5r 
+original_lsoas %>%
+  anti_join(TTM_PT %>% distinct(from_id), by = "from_id")
+
+original_lsoas %>%
+  anti_join(TTM_walk %>% distinct(from_id), by = "from_id")
+
+original_lsoas %>%
+  anti_join(TTM_cycle %>% distinct(from_id), by = "from_id")
+```
+
+ok it is the same, next, make it to retain all 4494 LSOAs and join the three modes together
+
+```{r}
+# take all lsoa 4994 first
+multimodal_travel_time_lsoa <- original_lsoas %>%
+  left_join(
+    # add PT TTM
+    TTM_PT_access %>%
+      select(
+        from_id,
+        nearest_access_point_PT,
+        travel_time_min_PT,
+        access_15_PT,
+        access_30_PT,
+        access_60_PT
+      ),
+    by = "from_id"
+  ) %>%
+  # add walking TTM
+  left_join(
+    TTM_walking_access %>%
+      select(
+        from_id,
+        nearest_access_point_walking,
+        travel_time_min_walking,
+        access_15_walking,
+        access_30_walking,
+        access_60_walking
+      ),
+    by = "from_id"
+  ) %>%
+  # add cycle TTM
+  left_join(
+    TTM_cycle_access %>%
+      select(
+        from_id,
+        nearest_access_point_cycling,
+        travel_time_min_cycling,
+        access_15_cycling,
+        access_30_cycling,
+        access_60_cycling
+      ),
+    by = "from_id"
+  ) %>%
+  # mutate and no TTM LSOAs access times in FALSE
+  mutate(
+    access_15_PT = coalesce(access_15_PT, FALSE),
+    access_30_PT = coalesce(access_30_PT, FALSE),
+    access_60_PT = coalesce(access_60_PT, FALSE),
+
+    access_15_walking = coalesce(access_15_walking, FALSE),
+    access_30_walking = coalesce(access_30_walking, FALSE),
+    access_60_walking = coalesce(access_60_walking, FALSE),
+
+    access_15_cycling = coalesce(access_15_cycling, FALSE),
+    access_30_cycling = coalesce(access_30_cycling, FALSE),
+    access_60_cycling = coalesce(access_60_cycling, FALSE)
+  )
+```
+
+```{r}
+# check
+nrow(multimodal_travel_time_lsoa)
+```
+
+```{r}
+# check
+head(multimodal_travel_time_lsoa)
+```
+
+```{r}
+# check one missing LSOA
+multimodal_travel_time_lsoa %>%
+  filter(from_id == "E01002482")
+```
+
+```{r}
+# save as CSV (just a copy for just in case)
+write.csv(multimodal_travel_time_lsoa, "data/multimodal_travel_time_lsoa.csv", row.names = FALSE)
+```
+
+### 5.5. Join LSOA and Save file
+
+```{r}
+london_lsoa_ttm <- london_lsoa %>%
+  left_join(
+    multimodal_travel_time_lsoa,
+    by = c("LSOA21CD" = "from_id")
+  )
+
+nrow(london_lsoa_ttm)
+```
+
+```{r}
+# save as geopackage cus names too long
+st_write(london_lsoa_ttm,"data/multimodal_travel_time_lsoa/multimodal_travel_time_lsoa.gpkg", delete_dsn = TRUE)
+```
+
+###  
