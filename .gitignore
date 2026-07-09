@@ -72,6 +72,8 @@ data/greenspace_london*
 data/greenspace_london_2ha*
 # London LSOA population weighted centroids
 data/london_lsoa_pop_weighted_centroids*
+# IMD2025
+data/File_1_IoD2025_Index_of_Multiple_Deprivation.xlsx
 #
 data/r5r_v2.3.1_TTM*
 data/gtfs_originals*

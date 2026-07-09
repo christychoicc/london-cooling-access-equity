@@ -2,3 +2,20 @@
 title: "6_Equity_Analysis"
 ---
 
+```{r}
+# remove objects from R environment and clear memory
+rm(list = ls())    
+gc()
+```
+
+## Load Packages
+
+```{r}
+
+```
+
+## Data Loading 
+
+```{r}
+
+```

@@ -64,6 +64,8 @@ london_lsoa_pop_weighted_centroids <- st_read("data/london_lsoa_pop_weighted_cen
 
 ## 1. Origins
 
+**London LSOA population weighted centroids**
+
 ```{r}
 london_centroids_map <- ggplot() +
   geom_sf(
@@ -109,7 +111,7 @@ london_centroids_map <- ggplot() +
   ) +
   geom_sf(
     data = london_lsoa_pop_weighted_centroids,
-    aes(fill = "Population Weighted Centroids"),   # this creates the legend
+    aes(fill = "Population Weighted Centroids"),
     shape = 21,
     colour = "black",
     stroke = 0.08,
@@ -188,6 +190,7 @@ cooling_effective_UGS_clean <- cooling_effective_UGS %>%
   # select needed columns
   select(id, functn_, geometry) %>%
   # filter park functions to Public Park or Garden and Playing Field only
+  # reasons refer to above table
   filter(functn_ %in% c("Public Park Or Garden", "Playing Field"))
 
 # check
@@ -199,6 +202,7 @@ unique(cooling_effective_UGS_clean$functn_)
 ### 2.2. Join Filtered Cooling Effective UGS with Access Points
 
 ```{r}
+# check
 nrow(greenspace_access_points)
 names(greenspace_access_points)
 ```
@@ -215,6 +219,8 @@ cooling_effective_access_points <- greenspace_access_points %>%
 ```
 
 ```{r}
+# check
+# number of access points
 nrow(cooling_effective_access_points)
 ```
 
@@ -331,7 +337,7 @@ access_point_map
 | Destinations | cooling_effective_access_points    |
 
 ```{r}
-# check column names now
+# check column names
 names(london_lsoa_pop_weighted_centroids)
 names(cooling_effective_access_points)
 ```
@@ -1040,5 +1046,3 @@ nrow(london_lsoa_ttm)
 # save as geopackage cus names too long
 st_write(london_lsoa_ttm,"data/multimodal_travel_time_lsoa/multimodal_travel_time_lsoa.gpkg", delete_dsn = TRUE)
 ```
-
-### 
