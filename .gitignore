@@ -74,6 +74,9 @@ data/greenspace_london_2ha*
 data/london_lsoa_pop_weighted_centroids*
 # IMD2025
 data/File_1_IoD2025_Index_of_Multiple_Deprivation.xlsx
+# census 2021
+data/census_2021
+
 #
 data/r5r_v2.3.1_TTM*
 data/gtfs_originals*

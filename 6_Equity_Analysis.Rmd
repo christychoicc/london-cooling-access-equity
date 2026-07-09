@@ -11,10 +11,48 @@ gc()
 ## Load Packages
 
 ```{r}
-
+library(readxl)
 ```
 
-## Data Loading 
+## Data Loading
+
+```{r}
+# travel time 
+multimodal_travel_time_lsoa <- st_read("data/multimodal_travel_time_lsoa/multimodal_travel_time_lsoa.gpkg")
+```
+
+```{r}
+# SUHII as lsoa heat exposure
+suhii_lsoa <- st_read("data/London_LSOA_LST_SUHI/London_LSOA_LST_SUHI.shp")%>% 
+  st_transform(.,27700)
+```
+
+```{r}
+# IMD score
+imd_score <- read.excel("data/File_1_IoD2025_Index_of_Multiple_Deprivation.xlsx")
+```
+
+```{r}
+# census data
+
+# age by 5 year band
+census_age <- read.csv("data/census_2021/TS007A_Age_by_five_year_age_bands.csv")
+
+# disability
+census_disability <- read.csv("data/census_2021/TS038_Disability.csv")
+
+# car ownership
+census_carownership <- read.csv("data/census_2021/TS045_Car_or_van_availability.csv")
+
+# occupancy rating bedrooms
+census_occup_rating_bedrooms <- read.csv("data/census_2021/TS052_Occupancy_rating_for_bedrooms.csv")
+```
+
+## Data Cleaning
+
+```{r}
+nrows(multimodal_travel_time_lsoa)
+```
 
 ```{r}
 
