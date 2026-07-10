@@ -226,7 +226,7 @@ nrow(cooling_effective_access_points)
 
 **Map: Cooling Effective Greenspace Access Points**
 
-```{r}
+```{r, eval=FALSE}
 # ensure consist CRS
 london_boundary <- st_transform(london_boundary,st_crs(cooling_effective_UGS_clean))
 
@@ -303,6 +303,66 @@ access_point_map <- ggplot() +
   ) +
   scale_fill_manual(
     values = c("Access Points" = "#3B5E61"),
+    name = NULL
+  ) +
+  guides(
+    fill = guide_legend(
+      override.aes = list(
+        shape = 25,
+        colour = "black",
+        size = 3,
+        stroke = 0.25,
+        alpha = 0.9
+      )
+    )
+  ) +
+  coord_sf(datum = NA) +
+  theme_void() +
+  theme(
+    plot.background = element_rect(fill = "white", colour = NA),
+    legend.position = "bottom",
+    legend.justification = "center",
+    legend.text = element_text(size = 10),
+    legend.margin = margin(t = 2, b = 2)
+  )
+
+access_point_map
+```
+
+```{r}
+# map with legend
+# ensure consist CRS
+london_boundary <- st_transform(london_boundary, st_crs(cooling_effective_UGS_clean))
+greenspace2ha <- st_transform(greenspace2ha, st_crs(cooling_effective_UGS_clean))
+cooling_effective_access_points <- st_transform(cooling_effective_access_points, st_crs(cooling_effective_UGS_clean))
+
+access_point_map <- ggplot() +
+  geom_sf(
+    data = london_boundary,
+    fill = "white",
+    colour = "grey30"
+  ) +
+  geom_sf(
+    data = greenspace2ha,
+    fill = "grey85",
+    colour = NA
+  ) +
+  geom_sf(
+    data = cooling_effective_UGS_clean,
+    fill = "#B8DDDA",   # light teal
+    colour = NA
+  ) +
+  geom_sf(
+    data = cooling_effective_access_points,
+    aes(fill = "Access Points"),
+    shape = 25,              # upside-down triangle
+    colour = "black",
+    stroke = 0.15,
+    size = 0.8,
+    alpha = 0.9
+  ) +
+  scale_fill_manual(
+    values = c("Access Points" = "#008F8C"),   # dark teal
     name = NULL
   ) +
   guides(
