@@ -11,48 +11,196 @@ gc()
 ## Load Packages
 
 ```{r}
-library(readxl)
+library(readr)
+library(tidyverse)
+library(tmap)
+library(plotly)
+library(broom)
+library(mapview)
+library(sf)
+library(sp)
+library(spdep)
+library(car)
+library(fs)
+library(janitor)
 ```
 
 ## Data Loading
 
+Clean names, select initial needed columns and rename columns for consistency across datasets
+
+**Data obtained from previous pre-processing**
+
 ```{r}
 # travel time 
-multimodal_travel_time_lsoa <- st_read("data/multimodal_travel_time_lsoa/multimodal_travel_time_lsoa.gpkg")
+multimodal_travel_time_lsoa <- st_read("data/multimodal_travel_time_lsoa/multimodal_travel_time_lsoa.gpkg")%>%
+  clean_names()%>%
+  select(
+    lsoa21cd,
+    lsoa21nm,
+    travel_time_min_pt,
+    travel_time_min_walking,
+    travel_time_min_cycling,
+    geom
+  )%>%
+  rename(
+    geometry = geom
+  )
 ```
 
 ```{r}
 # SUHII as lsoa heat exposure
 suhii_lsoa <- st_read("data/London_LSOA_LST_SUHI/London_LSOA_LST_SUHI.shp")%>% 
-  st_transform(.,27700)
+  st_transform(.,27700)%>%
+  clean_names()%>%
+  select(
+    lsoa21cd,
+    lsoa21nm,
+    mean,
+    london_mea,
+    lst_differ,
+    geometry
+  )%>%
+  rename(
+    mean_lst_lsoa = mean,
+    london_mean = london_mea,
+    suhii = lst_differ
+  )
 ```
+
+**IMD 2025 data**
 
 ```{r}
 # IMD score
-imd_score <- read.excel("data/File_1_IoD2025_Index_of_Multiple_Deprivation.xlsx")
+imd_score <- read_csv("data/IMD_2025.csv")%>%
+  clean_names()%>%
+  select(
+    lsoa_code_2021,
+    lsoa_name_2021,
+    index_of_multiple_deprivation_imd_score
+    )%>%
+  rename(
+    lsoa21cd = lsoa_code_2021,
+    lsoa21nm = lsoa_name_2021,
+    imd_score = index_of_multiple_deprivation_imd_score
+  )
+```
+
+**Census Data**
+
+```{r}
+# TS006 population density
+census_pop_density <- read_csv("data/census2021/census2021-ts006-lsoa.csv")%>%
+  clean_names()%>%
+  select(
+    geography,
+    geography_code,
+    population_density_persons_per_square_kilometre_measures_value
+  )%>%
+  rename(
+    lsoa21cd = geography_code,
+    lsoa21nm = geography,
+    pop_density = population_density_persons_per_square_kilometre_measures_value
+  )
 ```
 
 ```{r}
-# census data
+# TS007a age by 5 year band
+census_age_5year_band <- read_csv("data/census2021/census2021-ts007a-lsoa.csv")%>%
+  clean_names()%>%
+  select(
+    geography,
+    geography_code,
+    age_aged_4_years_and_under,
+    age_aged_65_to_69_years,
+    age_aged_70_to_74_years,
+    age_aged_75_to_79_years,
+    age_aged_80_to_84_years,
+    age_aged_85_years_and_over
+  )%>%
+  rename(
+    lsoa21cd = geography_code,
+    lsoa21nm = geography,
+    age_4_and_under = age_aged_4_years_and_under,
+    age_65_to_69 = age_aged_65_to_69_years,
+    age_70_to_74 = age_aged_70_to_74_years,
+    age_75_to_79 = age_aged_75_to_79_years,
+    age_80_to_84 = age_aged_80_to_84_years,
+    age_85_and_over = age_aged_85_years_and_over
+  )
+```
 
-# age by 5 year band
-census_age <- read.csv("data/census_2021/TS007A_Age_by_five_year_age_bands.csv")
+```{r}
+# TS038 disability
+census_disability <- read_csv("data/census2021/census2021-ts038-lsoa.csv")%>%
+  clean_names()%>%
+  select(
+    geography,
+    geography_code,
+    disability_total_all_usual_residents,
+    disability_disabled_under_the_equality_act
+  )%>%
+  rename(
+    lsoa21cd = geography_code,
+    lsoa21nm = geography
+  )
+```
 
-# disability
-census_disability <- read.csv("data/census_2021/TS038_Disability.csv")
+```{r}
+# TS037 general health
+census_health <- read_csv("data/census2021/census2021-ts037-lsoa.csv")%>% 
+  clean_names()
+```
 
-# car ownership
-census_carownership <- read.csv("data/census_2021/TS045_Car_or_van_availability.csv")
-
-# occupancy rating bedrooms
-census_occup_rating_bedrooms <- read.csv("data/census_2021/TS052_Occupancy_rating_for_bedrooms.csv")
+```{r}
+# TS021 Ethnicity
+census_ethnicity <- read_csv("data/census2021/census2021-ts021-lsoa.csv")%>%
+  clean_names()
 ```
 
 ## Data Cleaning
 
+### Check Initial Cleaned Data Column Names
+
 ```{r}
-nrows(multimodal_travel_time_lsoa)
+# check travel time for the 3 modes 
+names(multimodal_travel_time_lsoa)
 ```
+
+```{r}
+# check names in SUHII export
+names(suhii_lsoa)
+```
+
+```{r}
+# check IMD names
+names(imd_score)
+```
+
+```{r}
+# check census data
+names(census_pop_density)
+```
+
+```{r}
+names(census_age_5year_band)
+```
+
+```{r}
+names(census_disability)
+```
+
+```{r}
+names(census_health)
+```
+
+```{r}
+names(census_ethnicity)
+```
+
+## Regression Diagnostics
+
+Data distribution of variables
 
 ```{r}
 
