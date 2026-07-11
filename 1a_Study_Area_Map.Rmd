@@ -19,7 +19,7 @@ london_lsoa <- st_read("data/lsoa_london/lsoa_london.shp")
 ```
 
 ```{r}
-uk_boundary <- st_read("data/gadm41_GBR_0.json")%>%
+uk_boundary <- st_read("data/raw_data/gadm41_GBR_0.json")%>%
   st_transform(.,27700)
 ```
 
