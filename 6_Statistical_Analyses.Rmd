@@ -29,6 +29,12 @@ library(janitor)
 
 Clean names, select initial needed columns and rename columns for consistency across datasets
 
+**London only LSOAs**
+
+```{r}
+london_lsoa <- st_read("data/lsoa_london/lsoa_london.shp")
+```
+
 **Data obtained from previous pre-processing**
 
 ```{r}
@@ -111,6 +117,7 @@ census_age_5year_band <- read_csv("data/census2021/census2021-ts007a-lsoa.csv")%
   select(
     geography,
     geography_code,
+    age_total,
     age_aged_4_years_and_under,
     # for filter for age 65 or over 
     age_aged_65_to_69_years,
@@ -156,11 +163,15 @@ census_disability <- read_csv("data/census2021/census2021-ts038-lsoa.csv")%>%
 census_health <- read_csv("data/census2021/census2021-ts037-lsoa.csv")%>% 
   clean_names()%>%
   select(
+    geography,
+    geography_code,
     general_health_total_all_usual_residents,
     general_health_bad_health,
     general_health_very_bad_health
   )%>%
   rename(
+    lsoa21cd = geography_code,
+    lsoa21nm = geography,
     general_health_total_residents = general_health_total_all_usual_residents,
     general_health_bad = general_health_bad_health,
     general_health_very_bad = general_health_very_bad_health
@@ -169,19 +180,29 @@ census_health <- read_csv("data/census2021/census2021-ts037-lsoa.csv")%>%
 
 ```{r}
 # TS021 Ethnicity
+# definition of ethnic minority groups
+# https://www.ethnicity-facts-figures.service.gov.uk/style-guide/writing-about-ethnicity/ 
+# https://service-manual.ons.gov.uk/content/language/ethnicity-and-race
 census_ethnicity <- read_csv("data/census2021/census2021-ts021-lsoa.csv")%>%
   clean_names()%>%
   select(
-    ethnic_group_total_all_usual_residents
+    geography,
+    geography_code,
+    ethnic_group_total_all_usual_residents,
+    # Use “Ethnic minorities” to refer to all ethnic groups except the White British group
+    ethnic_group_white_english_welsh_scottish_northern_irish_or_british
   )%>%
   rename(
-    
+    lsoa21cd = geography_code,
+    lsoa21nm = geography,
+    ethnic_group_total_residents = ethnic_group_total_all_usual_residents,
+    white_british_group = ethnic_group_white_english_welsh_scottish_northern_irish_or_british
   )
 ```
 
 ## Data Cleaning
 
-### Check Initial Cleaned Data Column Names
+### Check Loaded + Initial Cleaned Data Column Names
 
 ```{r}
 # check travel time for the 3 modes 
@@ -217,6 +238,82 @@ names(census_health)
 
 ```{r}
 names(census_ethnicity)
+```
+
+### Wrangle data variables for regression modelling
+
+```{r}
+census_age_cleaned <- census_age_5year_band %>%
+  mutate(
+    age_65_and_over = rowSums(
+      across(
+        c(
+          age_65_to_69,
+          age_70_to_74,
+          age_75_to_79,
+          age_80_to_84,
+          age_85_and_over
+        )
+      ),
+      na.rm = TRUE
+    ),
+    age_65_and_over_pct = if_else(
+      age_total > 0,
+      (age_65_and_over / age_total)* 100,
+      NA_real_
+    )
+  )
+```
+
+```{r}
+census_disability_cleaned <- census_disability %>%
+  mutate(
+    disability_pct = if_else(
+      disability_total_residents > 0,
+      (disabled / disability_total_residents)* 100,
+      NA_real_
+    )
+  )
+```
+
+```{r}
+census_health_cleaned <- census_health %>%
+  mutate(
+    health_bad_verybad = rowSums(
+      across(
+        c(
+          general_health_bad,
+          general_health_very_bad
+        )
+      ),
+      na.rm = TRUE
+    ),
+    health_bad_verybad_pct = if_else(
+      general_health_total_residents > 0,
+      (health_bad_verybad / general_health_total_residents)* 100,
+      NA_real_
+    )
+  )
+```
+
+```{r}
+census_ethnicity_cleaned <- census_ethnicity %>%
+   mutate(
+    ethnic_minority =
+      ethnic_group_total_residents - white_british_group,
+    
+    ethnic_minority_pct = if_else(
+      ethnic_group_total_residents > 0,
+      (ethnic_minority / ethnic_group_total_residents) * 100,
+      NA_real_
+    )
+  )
+```
+
+## Join Data
+
+```{r}
+
 ```
 
 ## Regression Diagnostics
