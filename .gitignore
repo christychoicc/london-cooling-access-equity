@@ -64,6 +64,8 @@ rjavaenv*
 .Rprofile
 
 # pre-filtered files:
+# uk boundary
+data/raw_data/gadm41_GBR_0.json
 # London LSOA
 data/lsoa_london*
 # Greenspace London
