@@ -112,6 +112,7 @@ census_age_5year_band <- read_csv("data/census2021/census2021-ts007a-lsoa.csv")%
     geography,
     geography_code,
     age_aged_4_years_and_under,
+    # for filter for age 65 or over 
     age_aged_65_to_69_years,
     age_aged_70_to_74_years,
     age_aged_75_to_79_years,
@@ -142,20 +143,40 @@ census_disability <- read_csv("data/census2021/census2021-ts038-lsoa.csv")%>%
   )%>%
   rename(
     lsoa21cd = geography_code,
-    lsoa21nm = geography
+    lsoa21nm = geography,
+    # total number of residents 
+    disability_total_residents = disability_total_all_usual_residents,
+    # disabled under the Equality Act 2010
+    disabled = disability_disabled_under_the_equality_act
   )
 ```
 
 ```{r}
 # TS037 general health
 census_health <- read_csv("data/census2021/census2021-ts037-lsoa.csv")%>% 
-  clean_names()
+  clean_names()%>%
+  select(
+    general_health_total_all_usual_residents,
+    general_health_bad_health,
+    general_health_very_bad_health
+  )%>%
+  rename(
+    general_health_total_residents = general_health_total_all_usual_residents,
+    general_health_bad = general_health_bad_health,
+    general_health_very_bad = general_health_very_bad_health
+  )
 ```
 
 ```{r}
 # TS021 Ethnicity
 census_ethnicity <- read_csv("data/census2021/census2021-ts021-lsoa.csv")%>%
-  clean_names()
+  clean_names()%>%
+  select(
+    ethnic_group_total_all_usual_residents
+  )%>%
+  rename(
+    
+  )
 ```
 
 ## Data Cleaning
