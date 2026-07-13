@@ -848,9 +848,7 @@ Walking = 3497514
 Cycling = 8288685
 ```
 
-### Run Min Travel Time / Accessibility Score
-
-### 5.3. Minimum Travel Time
+### 5.3. Accessibility Score
 
 **Load the TTM objects**
 
@@ -875,42 +873,6 @@ head(TTM_cycle)
 ```{r}
 names(cooling_effective_access_points)
 ```
-
-**Select minimum value between pairs**
-
-```{r}
-# public transit
-TTM_PT_min_pairs <- TTM_PT %>%
-  group_by(from_id, to_id) %>% 
-  slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
-  ungroup()
-```
-
-```{r}
-# walk
-TTM_walk_min_pairs <- TTM_walk %>%
-  group_by(from_id, to_id) %>% 
-  slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
-  ungroup()
-```
-
-```{r}
-# cycle
-TTM_cycle_min_pairs <- TTM_cycle %>%
-  group_by(from_id, to_id) %>% 
-  slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
-  ungroup()
-```
-
-```{r}
-# already checked nrows have the same (not changed)
-# check
-head(TTM_PT_min_pairs)
-head(TTM_walk_min_pairs)
-head(TTM_cycle_min_pairs)
-```
-
-### 5.4. Accessibility Scores
 
 ```{r}
 # join: access point id to find parent greenspace site
@@ -1022,215 +984,66 @@ names(accessibility_score_all)
 head(accessibility_score_all)
 ```
 
-### 5.5. Filter Minimum Travel Time for the nearest cooling effective UGS and for 15 min, 30 min and 60 min
-
 ```{r}
-TTM_PT_access <- TTM_PT_min_pairs %>%
-  group_by(from_id) %>%
-  slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
-  ungroup() %>%
-  rename(
-    nearest_access_point_PT = to_id,
-    travel_time_min_PT = travel_time_p50
-  ) %>%
-  mutate(
-    access_15_PT = travel_time_min_PT <= 15,
-    access_30_PT = travel_time_min_PT <= 30,
-    access_60_PT = travel_time_min_PT <= 60
-  )
+summary(accessibility_score_all)
 ```
 
 ```{r}
-TTM_walking_access <- TTM_walk_min_pairs %>%
-  group_by(from_id) %>%
-  slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
-  ungroup() %>%
-  rename(
-    nearest_access_point_walking = to_id,
-    travel_time_min_walking = travel_time_p50
-  ) %>%
-  mutate(
-    access_15_walking = travel_time_min_walking <= 15,
-    access_30_walking = travel_time_min_walking <= 30,
-    access_60_walking = travel_time_min_walking <= 60
-  )
+accessibility_score_all %>% filter(access_score_60_cycle == 0)
+```
+
+Ok, 2 LSOAs have 0s –\> ok to keep it cus it may lie inside a CE UGS already
+
+### 5.5. Minimum Time to Nearest CE UGS
+
+```{r}
+# calculate min travel time to nearest cooling-effective park for each origin
+calc_min_time <- function(ttm_ugs, mode_name) {
+  ttm_ugs %>%
+    group_by(from_id) %>%
+    summarise(
+      !!paste0("travel_time_min_", mode_name) := min(travel_time_p50, na.rm = TRUE),
+      .groups = "drop"
+    )
+}
+
+# use TTM_mode1 cus already summarised to quickest access point in each ugs
+PT_min_time <- calc_min_time(TTM_PT1, "PT")
+walking_min_time <- calc_min_time(TTM_walk1, "walk")
+cycling_min_time <- calc_min_time(TTM_cycle1, "cycle")
 ```
 
 ```{r}
-TTM_cycle_access <- TTM_cycle_min_pairs %>%
-  group_by(from_id) %>%
-  slice_min(travel_time_p50, n = 1, with_ties = FALSE, na_rm = FALSE) %>%
-  ungroup() %>%
-  rename(
-    nearest_access_point_cycling = to_id,
-    travel_time_min_cycling = travel_time_p50
-  ) %>%
-  mutate(
-    access_15_cycling = travel_time_min_cycling <= 15,
-    access_30_cycling = travel_time_min_cycling <= 30,
-    access_60_cycling = travel_time_min_cycling <= 60
-  )
+accessibility <- accessibility_score_all %>%
+  full_join(PT_min_time, by = "from_id") %>%
+  full_join(walking_min_time, by = "from_id") %>%
+  full_join(cycling_min_time, by = "from_id")
 ```
 
 ```{r}
-saveRDS(TTM_PT_access, "data/r5r_TTM/TTM_PT_access.rds")
-saveRDS(TTM_walking_access, "data/r5r_TTM/TTM_walking_access.rds")
-saveRDS(TTM_cycle_access, "data/r5r_TTM/TTM_cycle_access.rds")
+nrow(accessibility)
+names(accessibility)
+head(accessibility)
 ```
 
-```{r}
-# check 
-head(TTM_PT_access)
-head(TTM_walking_access)
-head(TTM_cycle_access)
-```
+### 5.6. Join LSOA
 
 ```{r}
-# check
-nrow(TTM_PT_access)
-nrow(TTM_walking_access)
-nrow(TTM_cycle_access)
-```
-
-Ok, some LSOAs are missing, 1 missing each for PT and walking amd 3 missing for cycling, maybe because no routing available within our set max_trip_duration ... etc.
-
-Find which LSOAs are missing:
-
-```{r}
-# get original lsoas from origins
-original_lsoas <- origins %>%
-  st_drop_geometry() %>%
-  transmute(from_id = id)
-
-# check what missing from PT
-missing_PT <- original_lsoas %>%
-  anti_join(TTM_PT_access %>% distinct(from_id), by = "from_id")
-
-# check what missing from walking
-missing_walk <- original_lsoas %>%
-  anti_join(TTM_walking_access %>% distinct(from_id), by = "from_id")
-
-# check what missing from cycling
-missing_cycle <- original_lsoas %>%
-  anti_join(TTM_cycle_access %>% distinct(from_id), by = "from_id")
-
-missing_PT
-missing_walk
-missing_cycle
-```
-
-Missing LSOA in PT: E01002482
-
-Missing LSOA in Walking: E01002482
-
-Missing LSOAs in Cycling: E01033929, E01032783, E01002482
-
-```{r}
-# check if this is missing from beginning of r5r 
-original_lsoas %>%
-  anti_join(TTM_PT %>% distinct(from_id), by = "from_id")
-
-original_lsoas %>%
-  anti_join(TTM_walk %>% distinct(from_id), by = "from_id")
-
-original_lsoas %>%
-  anti_join(TTM_cycle %>% distinct(from_id), by = "from_id")
-```
-
-ok it is the same, next, make it to retain all 4494 LSOAs and join the three modes together
-
-```{r}
-# take all lsoa 4994 first
-multimodal_travel_time_lsoa <- original_lsoas %>%
+london_lsoa_accessibility <- london_lsoa %>%
   left_join(
-    # add PT TTM
-    TTM_PT_access %>%
-      select(
-        from_id,
-        nearest_access_point_PT,
-        travel_time_min_PT,
-        access_15_PT,
-        access_30_PT,
-        access_60_PT
-      ),
-    by = "from_id"
-  ) %>%
-  # add walking TTM
-  left_join(
-    TTM_walking_access %>%
-      select(
-        from_id,
-        nearest_access_point_walking,
-        travel_time_min_walking,
-        access_15_walking,
-        access_30_walking,
-        access_60_walking
-      ),
-    by = "from_id"
-  ) %>%
-  # add cycle TTM
-  left_join(
-    TTM_cycle_access %>%
-      select(
-        from_id,
-        nearest_access_point_cycling,
-        travel_time_min_cycling,
-        access_15_cycling,
-        access_30_cycling,
-        access_60_cycling
-      ),
-    by = "from_id"
-  ) %>%
-  # mutate and no TTM LSOAs access times in FALSE
-  mutate(
-    access_15_PT = coalesce(access_15_PT, FALSE),
-    access_30_PT = coalesce(access_30_PT, FALSE),
-    access_60_PT = coalesce(access_60_PT, FALSE),
-
-    access_15_walking = coalesce(access_15_walking, FALSE),
-    access_30_walking = coalesce(access_30_walking, FALSE),
-    access_60_walking = coalesce(access_60_walking, FALSE),
-
-    access_15_cycling = coalesce(access_15_cycling, FALSE),
-    access_30_cycling = coalesce(access_30_cycling, FALSE),
-    access_60_cycling = coalesce(access_60_cycling, FALSE)
-  )
-```
-
-```{r}
-# check
-nrow(multimodal_travel_time_lsoa)
-```
-
-```{r}
-# check
-head(multimodal_travel_time_lsoa)
-```
-
-```{r}
-# check one missing LSOA
-multimodal_travel_time_lsoa %>%
-  filter(from_id == "E01002482")
-```
-
-```{r}
-# save as CSV (just a copy for just in case)
-write.csv(multimodal_travel_time_lsoa, "data/multimodal_travel_time_lsoa.csv", row.names = FALSE)
-```
-
-### 5.6. Join LSOA and Save file
-
-```{r}
-london_lsoa_ttm <- london_lsoa %>%
-  left_join(
-    multimodal_travel_time_lsoa,
+    accessibility,
     by = c("LSOA21CD" = "from_id")
-  )
-
-nrow(london_lsoa_ttm)
+  ) %>%
+  mutate(across(starts_with("access_score"), ~replace_na(.x, 0)))
 ```
 
 ```{r}
+nrow(london_lsoa_accessibility)
+names(london_lsoa_accessibility)
+head(london_lsoa_accessibility)
+```
+
+```{r, eval=FALSE}
 # save as geopackage cus names too long
-st_write(london_lsoa_ttm,"data/multimodal_travel_time_lsoa/multimodal_travel_time_lsoa.gpkg", delete_dsn = TRUE)
+st_write(london_lsoa_accessibility,"data/multimodal_accessibility_lsoa.gpkg")
 ```
