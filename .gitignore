@@ -88,6 +88,7 @@ data/r5r_TTM*
 data/raw_data/r5r_raw
 # geopackage and csv
 data/multimodal_travel_time_lsoa*
+data/multimodal_accessibility_lsoa.gpkg*
 
 # GEE files
 data/London_LSOA_LST_SUHI*

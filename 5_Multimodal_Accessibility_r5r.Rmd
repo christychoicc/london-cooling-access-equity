@@ -329,7 +329,7 @@ access_point_map <- ggplot() +
 access_point_map
 ```
 
-```{r, eval=FALSE}
+```{r}
 # map with legend
 # ensure consist CRS
 london_boundary <- st_transform(london_boundary, st_crs(cooling_effective_UGS_clean))
@@ -965,7 +965,7 @@ names(cycling_accessibility_score)
 
 ```{r}
 head(PT_accessibility_score)
-nrow(PT_accessibility_score)   # number of origins that reached >= 1 park
+nrow(PT_accessibility_score)
 summary(PT_accessibility_score)
 ```
 
