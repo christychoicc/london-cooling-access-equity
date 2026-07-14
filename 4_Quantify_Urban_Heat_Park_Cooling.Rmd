@@ -141,112 +141,6 @@ ggsave(
 **Map: SUHII = LST (LSOA) - LST (London)**
 
 ```{r}
-# Fix geometry
-lsoa_lst <- st_make_valid(lsoa_lst)
-
-# set colours
-# blue = cooler than London mean, red = hotter than London mean
-diff_cols <- rev(brewer.pal(11, "RdBu"))
-
-
-# define SUHII breaks
-# data range: -9.98 to 8.53 so use -10 and 10 range
-lims <- c(-10, 10)
-
-# colours group into 2°C intervals
-breaks_seq <- seq(-10, 10, by = 2)
-
-# map plot
-map_plot <- ggplot(lsoa_lst) +
-  geom_sf(
-    aes(fill = lst_differ),
-    color = NA,
-    linewidth = 0
-  ) +
-  scale_fill_stepsn(
-    colours = diff_cols,
-    breaks = breaks_seq,
-    limits = lims,
-    oob = squish,
-    name = "SUHII"
-  ) +
-  coord_sf(datum = NA) +
-  theme_void() +
-  theme(
-    legend.position = "none",
-    plot.title = element_text(
-      hjust = 0.5,
-      face = "bold",
-      size = 14
-    ),
-    plot.margin = margin(5, 5, 5, 5)
-  )
-
-# histogram legend plot - each bar = 0.1°C
-# colours group into 2°C intervals
-hist_legend <- ggplot(
-  st_drop_geometry(lsoa_lst),
-  aes(x = lst_differ)
-) +
-  geom_histogram(
-    aes(fill = after_stat(x)),
-    binwidth = 0.1,
-    boundary = -10,
-    color = NA
-  ) +
-  geom_vline(
-    xintercept = breaks_seq,
-    linetype = "dashed",
-    linewidth = 0.35,
-    color = "black"
-  ) +
-  scale_fill_stepsn(
-    colours = diff_cols,
-    breaks = breaks_seq,
-    limits = lims,
-    oob = squish,
-    guide = "none"
-  ) +
-  scale_x_continuous(
-    limits = lims,
-    breaks = seq(-10, 10, by = 4),
-    labels = label_number(accuracy = 1)
-  ) +
-  labs(
-    x = "SUHII (°C)",
-    y = "LSOA Count"
-  ) +
-  theme_classic(base_size = 9) +
-  theme(
-    axis.title = element_text(size = 9),
-    axis.text = element_text(size = 7),
-    plot.background = element_rect(fill = "white", color = NA),
-    panel.background = element_rect(fill = "white", color = NA),
-    plot.margin = margin(3, 3, 3, 3)
-  )
-
-
-# put histogram next to map
-suhii_tm <- ggdraw() +
-  draw_plot(
-    map_plot,
-    x = 0,
-    y = 0,
-    width = 0.9,
-    height = 1
-  ) +
-  draw_plot(
-    hist_legend,
-    x = 0.72,
-    y = 0.10,
-    width = 0.25,
-    height = 0.22
-  )
-
-suhii_tm
-```
-
-```{r}
 # NYT colours for UHI 
 # Fix geometry
 lsoa_lst <- st_make_valid(lsoa_lst)
@@ -650,211 +544,6 @@ cooling_effective %>%
 
 **Map: Cooling Effective UGS by PCI**
 
-```{r, eval=FALSE}
-# not to run, keep code
-
-# Match CRS
-london_boundary <- st_transform(london_boundary, st_crs(greenspace_pci))
-cooling_effective <- st_transform(cooling_effective, st_crs(greenspace_pci))
-
-# Create 4 equal-interval PCI breaks using cooling-effective UGS only
-pci_breaks <- seq(
-  min(cooling_effective$PCI, na.rm = TRUE),
-  max(cooling_effective$PCI, na.rm = TRUE),
-  length.out = 5
-)
-
-# Clean legend labels
-pci_labels <- paste0(
-  sprintf("%.2f", pci_breaks[-length(pci_breaks)]),
-  " - ",
-  sprintf("%.2f", pci_breaks[-1])
-)
-
-# Blue palette: low PCI = light blue, high PCI = dark blue
-pci_blues <- c(
-  "#C6DBEF", 
-  "#6BAED6", 
-  "#3182BD", 
-  "#08519C"
-)
-
-# Add PCI classes to cooling-effective UGS only
-cooling_effective_map <- cooling_effective %>%
-  mutate(
-    PCI_bin = cut(
-      PCI,
-      breaks = pci_breaks,
-      labels = pci_labels,
-      include.lowest = TRUE
-    )
-  )
-
-# Plot map: all greenspaces grey underneath, cooling-effective UGS on top
-pci_map <- ggplot() +
-  geom_sf(
-    data = london_boundary,
-    fill = "white",
-    colour = "grey30",
-    linewidth = 0.4
-  ) +
-  geom_sf(
-    data = greenspace_pci,
-    aes(fill = "< 0.00"),
-    colour = NA
-  ) +
-  geom_sf(
-    data = cooling_effective_map,
-    aes(fill = PCI_bin),
-    colour = NA
-  ) +
-  scale_fill_manual(
-    name = "PCI",
-    values = c(
-      "< 0.00" = "grey80",
-      setNames(pci_blues, pci_labels)
-    ),
-    breaks = c("< 0.00", pci_labels),
-    drop = FALSE
-  ) +
-  coord_sf(datum = NA) +
-  theme_void() +
-  theme(
-    legend.position = "right",
-    legend.title = element_text(size = 12, face = "bold"),
-    legend.text = element_text(size = 10),
-    legend.key.size = unit(0.45, "cm"),
-    plot.background = element_rect(fill = "white", color = NA)
-  )
-
-pci_map
-```
-
-```{r, eval=FALSE}
-# Fix geometries
-london_boundary <- st_make_valid(london_boundary)
-greenspace_pci <- st_make_valid(greenspace_pci)
-cooling_effective <- st_make_valid(cooling_effective)
-
-# Match CRS
-london_boundary <- st_transform(london_boundary, st_crs(greenspace_pci))
-cooling_effective <- st_transform(cooling_effective, st_crs(greenspace_pci))
-
-# Static tmap mode
-tmap_mode("plot")
-
-# Create 4 equal-interval PCI breaks using cooling-effective UGS only
-pci_breaks <- seq(
-  min(cooling_effective$PCI, na.rm = TRUE),
-  max(cooling_effective$PCI, na.rm = TRUE),
-  length.out = 5
-)
-
-# Blue palette: low PCI = light blue, high PCI = dark blue
-pci_blues <- c(
-  "#C6DBEF", 
-  "#6BAED6", 
-  "#3182BD", 
-  "#08519C"
-)
-
-# Add PCI classes to cooling-effective UGS only
-cooling_effective_map <- cooling_effective %>%
-  mutate(
-    PCI_bin = cut(
-      PCI,
-      breaks = pci_breaks,
-      include.lowest = TRUE
-    )
-  )
-
-# ggplot2 map — color = NA means NO borders, guaranteed
-pci_map_gg <- ggplot() +
-  geom_sf(
-    data = london_boundary,
-    fill = "white",
-    color = "grey30",
-    linewidth = 0.4
-  ) +
-  geom_sf(
-    data = greenspace_pci,
-    fill = "grey80",
-    color = NA          # no border
-  ) +
-  geom_sf(
-    data = cooling_effective_map,
-    aes(fill = PCI_bin),
-    color = NA          # no border
-  ) +
-  scale_fill_manual(values = pci_blues, guide = "none") +
-  theme_void() +
-  theme(
-    plot.background = element_rect(fill = "white", color = NA),
-    panel.background = element_rect(fill = "white", color = NA)
-  )
-
-# Histogram legend for PCI values
-hist_legend_pci <- ggplot(
-  st_drop_geometry(cooling_effective),
-  aes(x = PCI)
-) +
-  geom_histogram(
-    aes(fill = after_stat(x)),
-    bins = 40,
-    color = NA
-  ) +
-  geom_vline(
-    xintercept = pci_breaks,
-    linetype = "dashed",
-    linewidth = 0.35,
-    color = "black"
-  ) +
-  scale_fill_stepsn(
-    colours = pci_blues,
-    breaks = pci_breaks,
-    limits = range(pci_breaks),
-    oob = scales::squish,
-    guide = "none"
-  ) +
-  scale_x_continuous(
-    limits = range(pci_breaks),
-    breaks = pci_breaks,
-    labels = scales::label_number(accuracy = 0.01),
-    expand = c(0, 0)
-  ) +
-  labs(
-    x = "PCI",
-    y = "UGS Count"
-  ) +
-  theme_classic(base_size = 9) +
-  theme(
-    axis.title = element_text(size = 9),
-    axis.text = element_text(size = 7),
-    plot.background = element_rect(fill = "white", color = NA),
-    panel.background = element_rect(fill = "white", color = NA),
-    plot.margin = margin(3, 3, 3, 3)
-  )
-
-# plot together
-pci_map <- ggdraw() +
-  draw_plot(
-    pci_map_gg,
-    x = 0, 
-    y = 0,
-    width = 0.9, 
-    height = 1
-  ) +
-  draw_plot(
-    hist_legend_pci,
-    x = 0.72, 
-    y = 0.10,
-    width = 0.25, 
-    height = 0.22
-  )
-
-pci_map
-```
-
 ```{r}
 # Fix geometries
 london_boundary <- st_make_valid(london_boundary)
@@ -983,7 +672,7 @@ pci_map <- ggdraw() +
 pci_map
 ```
 
-```{r}
+```{r, eval=FALSE}
 # save as PNG
 ggsave(
   filename = "figures/Fig4_Cooling_Effective_UGS_PCI_map.png",
@@ -998,7 +687,7 @@ ggsave(
 
 ### 2.4. Save as Shapefile
 
-```{r}
+```{r, eval=FALSE}
 # create a folder
 dir.create("data/cooling_effective_UGS", recursive = TRUE, showWarnings = FALSE)
 
@@ -1013,3 +702,164 @@ st_write(
 ### 2.5. Limitations
 
 Did not remove pixels of water bodies, vegetation that potentially overlap with the buffer rings.
+
+### 2.6. Visualisation for next Step
+
+\*note this section is for plotting only, the analysis will be in the next markdown file
+
+```{r}
+# select UGS function and needed columns
+cooling_effective_UGS_clean <- cooling_effective %>%
+  # select needed columns
+  select(id, function_, PCI, geometry) %>%
+  # filter park functions to Public Park or Garden and Playing Field only
+  # reasons refer to above table
+  filter(function_ %in% c("Public Park Or Garden", "Playing Field"))
+```
+
+```{r}
+summary(cooling_effective_UGS_clean)
+```
+
+```{r}
+cooling_effective_UGS_clean %>%
+  st_drop_geometry() %>%
+  mutate(
+    PCI_bin = cut(
+      PCI,
+      breaks = c(0.00, 0.01, 0.02, 0.03),
+      include.lowest = TRUE
+    )
+  ) %>%
+  count(PCI_bin)
+```
+
+```{r}
+# Cooling-effective UGS that were removed by function filtering
+cooling_effective_filtered_out <- cooling_effective %>%
+  filter(!function_ %in% c("Public Park Or Garden", "Playing Field"))
+```
+
+```{r}
+pci_map_gg_clean <- ggplot() +
+  geom_sf(
+    data = london_boundary,
+    fill = "white",
+    color = "grey30",
+    linewidth = 0.4
+  ) +
+  geom_sf(
+    data = greenspace_pci,          # not cooling-effective -> light grey
+    fill = "#E3E3E3",
+    color = NA
+  ) +
+  geom_sf(
+    data = cooling_effective_filtered_out,   # <- NEW: cooling-effective but wrong function
+    fill = "#9E9E9E",                        # darker grey
+    color = NA
+  ) +
+  geom_sf(
+    data = cooling_effective_clean_map,      # kept parks -> teal (on top)
+    aes(fill = PCI_bin),
+    color = NA
+  ) +
+  scale_fill_manual(
+    values = pci_teals,
+    guide = "none"
+  ) +
+  theme_void() +
+  theme(
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA)
+  )
+
+
+# Histogram legend — filtered data
+hist_legend_pci_clean <- ggplot(
+  st_drop_geometry(cooling_effective_UGS_clean),   # <- filtered data
+  aes(x = PCI)
+) +
+  geom_histogram(
+    aes(fill = after_stat(x)),
+    bins = 40,
+    color = NA
+  ) +
+  geom_vline(
+    xintercept = pci_breaks,
+    linetype = "dashed",
+    linewidth = 0.35,
+    color = "black"
+  ) +
+  scale_fill_stepsn(
+    colours = pci_teals,
+    breaks = pci_breaks,
+    limits = range(pci_breaks),
+    oob = scales::squish,
+    guide = "none"
+  ) +
+  scale_x_continuous(
+    limits = range(pci_breaks),
+    breaks = pci_breaks,
+    labels = scales::label_number(accuracy = 0.01),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(0, 100), # ensure same range (plotted before and the y axis was 60)
+    breaks = c(0, 30, 60, 90),
+    expand = c(0, 0)
+  ) +
+  labs(
+    x = "PCI",
+    y = "UGS Count"
+  ) +
+  theme_classic(base_size = 9) +
+  theme(
+    axis.title = element_text(size = 9),
+    axis.text = element_text(size = 7),
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.margin = margin(3, 3, 3, 3)
+  )
+
+# Combine
+pci2_map <- ggdraw() +
+  draw_plot(
+    pci_map_gg_clean,
+    x = 0, y = 0, width = 0.9, height = 1
+  ) +
+  draw_plot(
+    hist_legend_pci_clean,
+    x = 0.72, y = 0.10, width = 0.25, height = 0.22
+  )
+
+pci2_map
+```
+
+Cowplot side by side
+
+```{r}
+library(cowplot)
+
+combined_pci_maps <- plot_grid(
+  pci_map,
+  pci2_map,
+  labels     = c("a", "b"),
+  label_size = 14,
+  ncol       = 2
+)
+
+combined_pci_maps
+```
+
+```{r}
+# save as PNG
+ggsave(
+  filename = "figures/Fig5_Cooling_Effective_UGS_PCI_map.png",
+  plot = combined_pci_maps,
+  width = 18,
+  height = 8.27,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
+```
