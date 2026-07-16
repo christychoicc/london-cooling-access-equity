@@ -48,7 +48,7 @@ london_lsoa <- st_read("data/lsoa_london/lsoa_london.shp")
 # travel time 
 multimodal_accessibility_lsoa <- st_read("data/multimodal_accessibility_lsoa.gpkg")%>%
   clean_names()%>%
-  select(
+  dplyr::select(
     lsoa21cd,
     lsoa21nm,
     access_score_15_pt,
@@ -72,7 +72,7 @@ multimodal_accessibility_lsoa <- st_read("data/multimodal_accessibility_lsoa.gpk
 suhii_lsoa <- st_read("data/London_LSOA_LST_SUHI/London_LSOA_LST_SUHI.shp")%>% 
   st_transform(.,27700)%>%
   clean_names()%>%
-  select(
+  dplyr::select(
     lsoa21cd,
     lsoa21nm,
     mean,
@@ -93,7 +93,7 @@ suhii_lsoa <- st_read("data/London_LSOA_LST_SUHI/London_LSOA_LST_SUHI.shp")%>%
 # IMD score
 imd_score <- read_csv("data/IMD_2025.csv")%>%
   clean_names()%>%
-  select(
+  dplyr::select(
     lsoa_code_2021,
     lsoa_name_2021,
     index_of_multiple_deprivation_imd_score
@@ -111,7 +111,7 @@ imd_score <- read_csv("data/IMD_2025.csv")%>%
 # TS006 population density
 census_pop_density <- read_csv("data/census2021/census2021-ts006-lsoa.csv")%>%
   clean_names()%>%
-  select(
+  dplyr::select(
     geography,
     geography_code,
     population_density_persons_per_square_kilometre_measures_value
@@ -127,7 +127,7 @@ census_pop_density <- read_csv("data/census2021/census2021-ts006-lsoa.csv")%>%
 # TS007a age by 5 year band
 census_age_5year_band <- read_csv("data/census2021/census2021-ts007a-lsoa.csv")%>%
   clean_names()%>%
-  select(
+  dplyr::select(
     geography,
     geography_code,
     age_total,
@@ -198,7 +198,7 @@ census_health <- read_csv("data/census2021/census2021-ts037-lsoa.csv")%>%
 # https://service-manual.ons.gov.uk/content/language/ethnicity-and-race
 census_ethnicity <- read_csv("data/census2021/census2021-ts021-lsoa.csv")%>%
   clean_names()%>%
-  select(
+  dplyr::select(
     geography,
     geography_code,
     ethnic_group_total_all_usual_residents,
@@ -243,14 +243,6 @@ names(census_pop_density)
 
 ```{r}
 names(census_age_5year_band)
-```
-
-```{r, eval=FALSE}
-names(census_disability)
-```
-
-```{r, eval=FALSE}
-names(census_health)
 ```
 
 ```{r}
@@ -357,7 +349,7 @@ london_join <- multimodal_accessibility_lsoa %>%
       # drop geom cus multimodal travel time already have it
       st_drop_geometry() %>%
       # select needed columns
-      select(lsoa21cd, suhii),
+      dplyr::select(lsoa21cd, suhii),
     # join by lsoa code
     by = "lsoa21cd"
   ) %>%
@@ -365,21 +357,21 @@ london_join <- multimodal_accessibility_lsoa %>%
   # IMD 
   left_join(
     imd_score_cleaned %>%
-      select(lsoa21cd, imd_score),
+      dplyr::select(lsoa21cd, imd_score),
     by = "lsoa21cd"
   ) %>%
   
   # population density
   left_join(
     census_pop_density %>%
-      select(lsoa21cd, pop_density),
+      dplyr::select(lsoa21cd, pop_density),
     by = "lsoa21cd"
   ) %>%
   
   # age
   left_join(
     census_age_cleaned %>%
-      select(lsoa21cd, age_4_and_under_pct, age_65_and_over_pct),
+      dplyr::select(lsoa21cd, age_4_and_under_pct, age_65_and_over_pct),
     by = "lsoa21cd"
   ) %>%
   
@@ -400,7 +392,7 @@ london_join <- multimodal_accessibility_lsoa %>%
   # ethnicity
   left_join(
     census_ethnicity_cleaned %>%
-      select(lsoa21cd, ethnic_minority_pct),
+      dplyr::select(lsoa21cd, ethnic_minority_pct),
     by = "lsoa21cd"
   )
 ```
@@ -438,8 +430,7 @@ london_join <- london_join %>%
 
 ```{r}
 #check
-unique(london_join$inner_outer_london)
-head(london_join)
+names(london_join)
 ```
 
 ## 2. Regression Data Preparation
@@ -458,7 +449,7 @@ view(check_data)
 # descriptive stats
 london_join %>%
   st_drop_geometry() %>%
-  select(where(is.numeric)) %>%
+  dplyr::select(where(is.numeric)) %>%
   summarise(across(everything(),
                    list(mean = ~mean(., na.rm = TRUE),
                         sd = ~sd(., na.rm = TRUE),
@@ -479,7 +470,7 @@ london_join %>%
 # Select only numeric columns
 numeric_cols <- london_join %>%
   sf::st_drop_geometry() %>%
-  select(where(is.numeric))
+  dplyr::select(where(is.numeric))
 
 # Convert to long format for faceting
 numeric_long <- numeric_cols %>%
@@ -571,75 +562,6 @@ corrplot(
 )
 
 dev.off()
-```
-
-**Plot the 6 Dependent Variables**
-
-```{r}
-access_score_long <- london_join %>%
-  st_drop_geometry() %>%
-  dplyr::select(
-    access_score_15_pt,
-    access_score_60_pt,
-    access_score_15_walk,
-    access_score_60_walk,
-    access_score_15_cycle,
-    access_score_60_cycle
-  ) %>%
-  pivot_longer(
-    cols = everything(),
-    names_to = "access_measure",
-    values_to = "access_score"
-  ) %>%
-  mutate(
-    access_measure = factor(
-      access_measure,
-      levels = c(
-        "access_score_15_pt",
-        "access_score_60_pt",
-        "access_score_15_walk",
-        "access_score_60_walk",
-        "access_score_15_cycle",
-        "access_score_60_cycle"
-      ),
-      labels = c(
-        "Public transport: 15 minutes",
-        "Public transport: 60 minutes",
-        "Walking: 15 minutes",
-        "Walking: 60 minutes",
-        "Cycling: 15 minutes",
-        "Cycling: 60 minutes"
-      )
-    )
-  )
-```
-
-```{r}
-access_distribution_plot <- ggplot(
-  access_score_long,
-  aes(x = access_score)
-) +
-  geom_histogram(
-    binwidth = 1,
-    boundary = -0.5,
-    colour = "white"
-  )+
-  facet_wrap(
-    ~ access_measure,
-    scales = "free",
-    ncol = 2
-  ) +
-  labs(
-    x = "Number of accessible cooling-effective green spaces",
-    y = "Number of LSOAs"
-  ) +
-  theme_minimal() +
-  theme(
-    strip.text = element_text(face = "bold"),
-    panel.grid.minor = element_blank()
-  )
-
-access_distribution_plot
 ```
 
 ### Transform Variables
@@ -772,7 +694,7 @@ for (nm in names(models_poisson)) {
 }
 ```
 
-## 6. Residuals with Moran's I 
+## 6. Residuals with Moran's I
 
 **Build spatial weights with LSOA boundary**
 
@@ -818,30 +740,66 @@ LLSOA.knn_4_weight <- LLSOA_knn %>%
   nb2listw(., style="W")
 ```
 
-Residuals, normally Pearson is used for traditional GLMs. But due to our count data, randomised quantile residuals is used here for Moran's I (reference: <https://pmc.ncbi.nlm.nih.gov/articles/PMC7329451/>)
+Residuals, normally Pearson is used for traditional GLMs. But count data, randomised quantile residuals is considered better (reference: <https://pmc.ncbi.nlm.nih.gov/articles/PMC7329451/>)
 
-### 6.1. access_score_15_pt (Poisson)
+But here still uses Pearson:
+
+```{r}
+# dharma residuals
+
+# install and load DHARMa package
+#library(DHARMa)
+
+# residuals
+# https://cran.r-project.org/web/packages/DHARMa/vignettes/DHARMa.html#notes-on-particular-data-types 
+#model_15_pt_resids <- simulateResiduals(fittedModel = model_15_pt)
+```
+
+### 6.1. access_score_15_pt
 
 ```{r}
 # name object first
 model_15_pt <- models_poisson$access_score_15_pt
+# VIF
+vif(model_15_pt)
+```
 
-# install and load DHARMa package
-library(DHARMa)
+Ok, VIF values are all below 5 or 10, no problem with multicolinearity, next look at residuals (auto)correlation
 
-# residuals
-# https://cran.r-project.org/web/packages/DHARMa/vignettes/DHARMa.html#notes-on-particular-data-types 
-model_15_pt_resids <- simulateResiduals(fittedModel = model_15_pt)
+```{r}
+# residuals with pearson
+model_15_pt_resids <- residuals(model_15_pt, "pearson")
+
+model_profile <- model_variables %>%
+  mutate(model_15_pt_resids)
+
+#now plot the residuals
+tmap_mode("view")
+qtm(model_profile, fill = "model_15_pt_resids")
 ```
 
 ```{r}
-# check if they are same nrows
-nobs(model_15_pt)
-length(model_15_pt_resids$scaledResiduals)
+# queens case
+model_15_pt_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_pt_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight)%>%
+  tidy()
+
+model_15_pt_resids_queen
 ```
 
 ```{r}
+# nearest neighbour
+model_15_pt_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_pt_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight)%>%
+  tidy()
 
+model_15_pt_resids_nearest_neighbour
 ```
 
 ### 6.2. access_score_60_pt
@@ -850,9 +808,50 @@ length(model_15_pt_resids$scaledResiduals)
 # name object first
 model_60_pt <- models_nb$access_score_60_pt
 
-# residuals
-# https://cran.r-project.org/web/packages/DHARMa/vignettes/DHARMa.html#notes-on-particular-data-types 
-model_60_pt_resids <- simulateResiduals(fittedModel = model_60_pt)
+# VIF
+vif(model_60_pt)
+```
+
+**Residuals and Map**
+
+```{r}
+# residuals with pearson
+model_60_pt_resids <- residuals(model_60_pt, "pearson")
+
+model_profile <- model_variables %>%
+  mutate(model_60_pt_resids)
+
+#now plot the residuals
+tmap_mode("view")
+qtm(model_profile, fill = "model_60_pt_resids")
+```
+
+**Moran's I - Queens Case**
+
+```{r}
+# queens case
+model_60_pt_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_pt_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight)%>%
+  tidy()
+
+model_60_pt_resids_queen
+```
+
+**Moran's I - 4 Nearest Neighbours**
+
+```{r}
+# nearest neighbour
+model_60_pt_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_pt_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight)%>%
+  tidy()
+
+model_60_pt_resids_nearest_neighbour
 ```
 
 ### 6.3. access_score_15_walk (Poisson)
@@ -862,11 +861,95 @@ model_60_pt_resids <- simulateResiduals(fittedModel = model_60_pt)
 model_15_walk <- models_poisson$access_score_15_walk
 ```
 
+**Residuals and Map**
+
+```{r}
+# residuals with pearson
+model_15_walk_resids <- residuals(model_15_walk, "pearson")
+
+model_profile <- model_variables %>%
+  mutate(model_15_walk_resids)
+
+#now plot the residuals
+tmap_mode("view")
+qtm(model_profile, fill = "model_15_walk_resids")
+```
+
+**Moran's I - Queens Case**
+
+```{r}
+# queens case
+model_15_walk_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_walk_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight)%>%
+  tidy()
+
+model_15_walk_resids_queen
+```
+
+**Moran's I - 4 Nearest Neighbours**
+
+```{r}
+# nearest neighbour
+model_15_walk_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_walk_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight)%>%
+  tidy()
+
+model_15_walk_resids_nearest_neighbour
+```
+
 ### 6.4. access_score_60_walk
 
 ```{r}
 # name object first
 model_60_walk <- models_nb$access_score_60_walk
+```
+
+**Residuals and Map**
+
+```{r}
+# residuals with pearson 
+model_60_walk_resids <- residuals(model_60_walk, "pearson")  
+
+model_profile <- model_variables %>%   
+  mutate(model_60_walk_resids)  
+
+#now plot the residuals 
+tmap_mode("view") 
+qtm(model_profile, fill = "model_60_walk_resids")
+```
+
+**Moran's I - Queens Case**
+
+```{r}
+# queens case 
+model_60_walk_resids_queen <- model_profile %>%   
+  st_drop_geometry()%>%   
+  dplyr::select(model_60_walk_resids)%>%   
+  pull()%>%   
+  moran.test(., LLSOA.queens_weight)%>%   
+  tidy()  
+
+model_60_walk_resids_queen
+```
+
+**Moran's I - 4 Nearest Neighbours**
+
+```{r}
+# nearest neighbour 
+model_60_walk_resids_nearest_neighbour <- model_profile %>%   
+  st_drop_geometry()%>%   
+  dplyr::select(model_60_walk_resids)%>%   
+  pull()%>%   
+  moran.test(., LLSOA.knn_4_weight)%>%   
+  tidy()  
+
+model_60_walk_resids_nearest_neighbour
 ```
 
 ### 6.5. access_score_15_cycle
@@ -876,6 +959,48 @@ model_60_walk <- models_nb$access_score_60_walk
 model_15_cycle <- models_nb$access_score_15_cycle
 ```
 
+**Residuals and Map**
+
+```{r}
+# residuals with pearson  
+model_15_cycle_resids <- residuals(model_15_cycle, "pearson")    
+
+model_profile <- model_variables %>%      
+  mutate(model_15_cycle_resids)    
+
+#now plot the residuals  
+tmap_mode("view")  
+qtm(model_profile, fill = "model_15_cycle_resids")
+```
+
+**Moran's I - Queens Case**
+
+```{r}
+# queens case  
+model_15_cycle_resids_queen <- model_profile %>%      
+  st_drop_geometry()%>%      
+  dplyr::select(model_15_cycle_resids)%>%      
+  pull()%>%      
+  moran.test(., LLSOA.queens_weight)%>%      
+  tidy()    
+
+model_15_cycle_resids_queen
+```
+
+**Moran's I - 4 Nearest Neighbours**
+
+```{r}
+# nearest neighbour  
+model_15_cycle_resids_nearest_neighbour <- model_profile %>%      
+  st_drop_geometry()%>%      
+  dplyr::select(model_15_cycle_resids)%>%      
+  pull()%>%      
+  moran.test(., LLSOA.knn_4_weight)%>%      
+  tidy()    
+
+model_15_cycle_resids_nearest_neighbour
+```
+
 ### 6.6. access_score_60_cycle
 
 ```{r}
@@ -883,8 +1008,54 @@ model_15_cycle <- models_nb$access_score_15_cycle
 model_60_cycle <- models_nb$access_score_60_cycle
 ```
 
-###  
+**Residuals and Map**
 
-## 7. (GWPR) Geographically Weighted Poisson Regression 
+```{r}
+# residuals with pearson   
+model_60_cycle_resids <- residuals(model_60_cycle, "pearson")      
+
+model_profile <- model_variables %>%         
+  mutate(model_60_cycle_resids)      
+
+#now plot the residuals   
+tmap_mode("view")   
+qtm(model_profile, fill = "model_60_cycle_resids")
+```
+
+**Moran's I - Queens Case**
+
+model_15_cycle
+
+```{r}
+# queens case   
+model_60_cycle_resids_queen <- model_profile %>%         
+  st_drop_geometry()%>%         
+  dplyr::select(model_60_cycle_resids)%>%         
+  pull()%>%         
+  moran.test(., LLSOA.queens_weight)%>%         
+  tidy()      
+
+model_60_cycle_resids_queen
+```
+
+**Moran's I - 4 Nearest Neighbours**
+
+```{r}
+# nearest neighbour   
+model_60_cycle_resids_nearest_neighbour <- model_profile %>%         
+  st_drop_geometry()%>%         
+  dplyr::select(model_60_cycle_resids)%>%         
+  pull()%>%         
+  moran.test(., LLSOA.knn_4_weight)%>%         
+  tidy()      
+
+model_60_cycle_resids_nearest_neighbour
+```
+
+### 6.7. Conclusion of Models
+
+Strong positive spatial autocorrelation for queens case and nearest neighbours by Moran's I for all models
+
+## 7. (GWPR) Geographically Weighted Poisson Regression
 
 Use this instead of traditional GWR as for regression relationships with a spatial count outcome.
