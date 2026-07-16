@@ -11,25 +11,27 @@ gc()
 ## Load Packages
 
 ```{r}
+library(sf)
+library(sp)
 library(readr)
+library(dplyr)
 library(knitr)
 library(tidyverse)
 library(tmap)
 library(cowplot)
 library(plotly)
 library(corrplot)
-library(MASS)
 library(broom)
 library(mapview)
 library(stringr)
-library(sf)
-library(sp)
 library(spdep)
 library(car)
 library(fs)
 library(janitor)
 library(GGally)
-library(dplyr)
+library(MASS)
+library(spatialreg)
+library(DHARMa)
 ```
 
 ## Data Loading
@@ -590,7 +592,11 @@ model_variables <- london_join %>%
 names(model_variables)
 ```
 
-## 4. Negative Binomial GLM
+## 4. Model Choices
+
+<https://rpubs.com/Geesaale/1263990> –\> count regression: poisson or negative binomial, depending on the nature of spatial dependence of data, spatial error more suitable (spatial error models is suitable when the spatial autocorrelation is due to an underlying spatial process or unmeasured factors).
+
+## 5. Negative Binomial GLM
 
 Loop all models:
 
@@ -638,20 +644,7 @@ for (nm in names(models_nb)) {
 }
 ```
 
-Iteration limit for access_score_15_pt and access_score_15_walk, tried on Poisson across all models and AIC values as below table (bold text refers to lower AIC values). Their AIC values are also higher in the the negative binomial regression:
-
-| Dependent variable    | AIC - Negative Binomial | AIC - Poisson |
-|-----------------------|-------------------------|---------------|
-| access_score_15_pt    | 13934                   | **13932**     |
-| access_score_60_pt    | **49596**               | 90101         |
-| access_score_15_walk  | 16249                   | **16247**     |
-| access_score_60_walk  | **32617**               | 33312         |
-| access_score_15_cycle | **21932**               | 22076         |
-| access_score_60_cycle | **42929**               | 55092         |
-
-So use poisson regression for those two only and run again as below:
-
-## 5. Poisson Regression
+## 6. Poisson Regression
 
 ```{r}
 # The predictors are the same for every model
@@ -694,7 +687,70 @@ for (nm in names(models_poisson)) {
 }
 ```
 
-## 6. Residuals with Moran's I
+```{r}
+# calculate Poisson dispersion
+check_dispersion <- function(model) {
+
+  pearson_chisq <- sum(
+    residuals(model, type = "pearson")^2,
+    na.rm = TRUE
+  )
+
+  residual_df <- df.residual(model)
+
+  dispersion_ratio <- pearson_chisq / residual_df
+
+  # approximate test of overdispersion
+  p_value <- pchisq(
+    pearson_chisq,
+    df = residual_df,
+    lower.tail = FALSE
+  )
+
+  data.frame(
+    pearson_chisq = pearson_chisq,
+    residual_df = residual_df,
+    dispersion_ratio = dispersion_ratio,
+    p_value = p_value
+  )
+}
+
+# apply to both Poisson models
+dispersion_results <- do.call(
+  rbind,
+  lapply(models_poisson, check_dispersion)
+)
+
+# add model names
+dispersion_results$model <- rownames(dispersion_results)
+rownames(dispersion_results) <- NULL
+
+# reorder columns
+dispersion_results <- dispersion_results[
+  c(
+    "model",
+    "dispersion_ratio",
+    "pearson_chisq",
+    "residual_df",
+    "p_value"
+  )
+]
+
+dispersion_results
+```
+
+Iteration limit for access_score_15_pt and access_score_15_walk, tried on Poisson across all models. Checked AIC values as below table (bold text refers to lower AIC values), their AIC values are also higher in the the negative binomial regression. As well as dispersion checked as above, dispersion values close to 1.
+
+| Dependent variable    | AIC - Negative Binomial | AIC - Poisson |
+|-----------------------|-------------------------|---------------|
+| access_score_15_pt    | 13934                   | **13932**     |
+| access_score_60_pt    | **49596**               | 90101         |
+| access_score_15_walk  | 16249                   | **16247**     |
+| access_score_60_walk  | **32617**               | 33312         |
+| access_score_15_cycle | **21932**               | 22076         |
+| access_score_60_cycle | **42929**               | 55092         |
+
+## 7. Residuals with Moran's I
 
 **Build spatial weights with LSOA boundary**
 
@@ -755,7 +811,7 @@ But here still uses Pearson:
 #model_15_pt_resids <- simulateResiduals(fittedModel = model_15_pt)
 ```
 
-### 6.1. access_score_15_pt
+### 7.1. access_score_15_pt
 
 ```{r}
 # name object first
@@ -802,7 +858,7 @@ model_15_pt_resids_nearest_neighbour <- model_profile %>%
 model_15_pt_resids_nearest_neighbour
 ```
 
-### 6.2. access_score_60_pt
+### 7.2. access_score_60_pt
 
 ```{r}
 # name object first
@@ -854,11 +910,13 @@ model_60_pt_resids_nearest_neighbour <- model_profile %>%
 model_60_pt_resids_nearest_neighbour
 ```
 
-### 6.3. access_score_15_walk (Poisson)
+### 7.3. access_score_15_walk (Poisson)
 
 ```{r}
 # name object first
 model_15_walk <- models_poisson$access_score_15_walk
+# VIF
+vif(model_15_walk)
 ```
 
 **Residuals and Map**
@@ -903,11 +961,13 @@ model_15_walk_resids_nearest_neighbour <- model_profile %>%
 model_15_walk_resids_nearest_neighbour
 ```
 
-### 6.4. access_score_60_walk
+### 7.4. access_score_60_walk
 
 ```{r}
 # name object first
 model_60_walk <- models_nb$access_score_60_walk
+# VIF
+vif(model_60_walk)
 ```
 
 **Residuals and Map**
@@ -952,11 +1012,13 @@ model_60_walk_resids_nearest_neighbour <- model_profile %>%
 model_60_walk_resids_nearest_neighbour
 ```
 
-### 6.5. access_score_15_cycle
+### 7.5. access_score_15_cycle
 
 ```{r}
 # name object first
 model_15_cycle <- models_nb$access_score_15_cycle
+# VIF
+vif(model_15_cycle)
 ```
 
 **Residuals and Map**
@@ -1001,11 +1063,13 @@ model_15_cycle_resids_nearest_neighbour <- model_profile %>%
 model_15_cycle_resids_nearest_neighbour
 ```
 
-### 6.6. access_score_60_cycle
+### 7.6. access_score_60_cycle
 
 ```{r}
 # name object first
 model_60_cycle <- models_nb$access_score_60_cycle
+# VIF
+vif(model_60_cycle)
 ```
 
 **Residuals and Map**
@@ -1052,10 +1116,51 @@ model_60_cycle_resids_nearest_neighbour <- model_profile %>%
 model_60_cycle_resids_nearest_neighbour
 ```
 
-### 6.7. Conclusion of Models
+### 7.7. Conclusion of Models' residuals
 
-Strong positive spatial autocorrelation for queens case and nearest neighbours by Moran's I for all models
+| Model          | Family            | Moran's I (Queens) | Moran's I (knn) |
+|----------------|-------------------|--------------------|-----------------|
+| model_15_pt    | Poisson           | 0.5119248          | 0.5322355       |
+| model_60_pt    | Negative Binomial | 0.6729391          | 0.6872948       |
+| model_15_walk  | Poisson           | 0.6667913          | 0.6918659       |
+| model_60_walk  | Negative Binomial | 0.9055903          | 0.9090586       |
+| model_15_cycle | Negative Binomial | 0.7601062          | 0.7765267       |
+| model_60_cycle | Negative Binomial | 0.9209963          | 0.9120826       |
 
-## 7. (GWPR) Geographically Weighted Poisson Regression
+Strong positive spatial autocorrelation for queens case and nearest neighbours by Moran's I for all models, so next use spatial models
 
-Use this instead of traditional GWR as for regression relationships with a spatial count outcome.
+## 8. Spatial model -  Eigenvector Spatial Filtering (RE-ESF)
+
+Given that the data type is count data, traditional spatial error models may not be suitable here as a direct transfer of the spatial model types for continuous data is not possible (Reference: <https://www.econstor.eu/bitstream/10419/168040/1/89655662X.pdf>).
+
+Random effect - eigenvector spatial filtering (RE-ESP) to account for positive spatial autocorrelation/ dependence (identified in section 6,), can help reduce effect of spatial autocorrelation and reduce model bias and enahncing model fitting (<https://link.springer.com/article/10.1007/s11769-021-1191-y>) . This has been used in accessibility: (<https://www.sciencedirect.com/science/article/pii/S1618866721000807#sec0030>).
+
+Using the `spmoran` package
+
+```{r}
+# rewrite just to be clear 
+predictors <- c(
+  "imd_z * suhii_z",
+  "log_pop_density_z",
+  "age_4_under_z",
+  "age_65_over_z",
+  "ethnic_minority_z",
+  "inner_outer_london"
+)
+
+outcomes <- c(
+  "access_score_15_pt",
+  "access_score_60_pt",
+  "access_score_15_walk",
+  "access_score_60_walk",
+  "access_score_15_cycle",
+  "access_score_60_cycle"
+)
+
+# check 
+names(model_variables)
+```
+
+## 9. GWPR - Geographically Weighted Poisson Regression
+
+well known method to address issues of spatial nonstationarity, allowing geographic variations in the relationships between dependent and explanatory variables.
