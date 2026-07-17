@@ -1129,38 +1129,280 @@ model_60_cycle_resids_nearest_neighbour
 
 Strong positive spatial autocorrelation for queens case and nearest neighbours by Moran's I for all models, so next use spatial models
 
-## 8. Spatial model -  Eigenvector Spatial Filtering (RE-ESF)
+## 8. Global Spatial Regression model (for London wide spatial relationships)
 
-Given that the data type is count data, traditional spatial error models may not be suitable here as a direct transfer of the spatial model types for continuous data is not possible (Reference: <https://www.econstor.eu/bitstream/10419/168040/1/89655662X.pdf>).
+Given that the data type is **count data**, traditional **spatial error** models **may not be suitable** here as a direct transfer of the spatial model types for continuous data is not possible (Reference: <https://www.econstor.eu/bitstream/10419/168040/1/89655662X.pdf>).
+
+### 8.1. ESF - Choice 1 
 
 Random effect - eigenvector spatial filtering (RE-ESP) to account for positive spatial autocorrelation/ dependence (identified in section 6,), can help reduce effect of spatial autocorrelation and reduce model bias and enahncing model fitting (<https://link.springer.com/article/10.1007/s11769-021-1191-y>) . This has been used in accessibility: (<https://www.sciencedirect.com/science/article/pii/S1618866721000807#sec0030>).
 
-Using the `spmoran` package
+`spfilteR` <https://journal.r-project.org/articles/RJ-2021-085/>
+
+```{r, eval=FALSE}
+# install package from CRAN
+# install.packages("spfilteR")
+```
+
+### 8.2. BYM2 - Choice 2
+
+Bayesian spatial multilevel mixed-effects model incoporating BMY2 with `INLA` package
 
 ```{r}
-# rewrite just to be clear 
-predictors <- c(
-  "imd_z * suhii_z",
-  "log_pop_density_z",
-  "age_4_under_z",
-  "age_65_over_z",
-  "ethnic_minority_z",
-  "inner_outer_london"
-)
+# https://www.r-inla.org/download/index.html
+install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
+```
 
-outcomes <- c(
-  "access_score_15_pt",
-  "access_score_60_pt",
-  "access_score_15_walk",
-  "access_score_60_walk",
-  "access_score_15_cycle",
-  "access_score_60_cycle"
-)
-
+```{r}
 # check 
+packageVersion("INLA")
+```
+
+```{r}
+library(INLA)
+INLA::inla.version()
+```
+
+```{r}
+# check previous used model variables 
 names(model_variables)
 ```
 
-## 9. GWPR - Geographically Weighted Poisson Regression
+```{r}
+# make a spatial model variables to be clear
+spatial_model_variables <- model_variables %>%
+  dplyr::select(
+    lsoa21cd,
+    # dependent
+    access_score_15_pt,
+    access_score_60_pt,
+    access_score_15_walk,
+    access_score_60_walk,
+    access_score_15_cycle,
+    access_score_60_cycle,
+    # independent
+    imd_z,
+    suhii_z,
+    log_pop_density_z,
+    age_65_over_z,
+    ethnic_minority_z,
+    inner_outer_london,
+    geometry
+  ) %>%
+  arrange(lsoa21cd)
+```
+
+```{r}
+# check if it is sf objects
+class(spatial_model_variables)
+```
+
+#### 8.2.1. Spatial Neighbourhood structure
+
+```{r}
+# from here onwards follow code from: 
+# https://www.r-inla.org/examples/AlvinBong/alvinbong-example.html 
+
+# 1. Create a neighborhood list based on polygon contiguity - queens
+nb <- spdep::poly2nb(
+  spatial_model_variables,
+  queen = TRUE
+)
+
+# 2. Convert the neighbor list to INLA adjacency format
+spdep::nb2INLA("map.graph", nb)
+
+# 3. Set the location of the adjacency file for INLA
+map.adj <- file.path(getwd(), "map.graph")
+
+# 4. Load adjacency matrix as a graph for INLA spatial models
+g <- inla.read.graph(filename = map.adj)
+```
+
+### 8.2.3. Inla call/ fit
+
+```{r}
+# index for spatial effects
+spatial_model_variables$area_id <- 1:nrow(spatial_model_variables)
+```
+
+```{r}
+# specify model formula
+
+formula_15_pt <- access_score_15_pt ~
+  imd_z * suhii_z +
+  log_pop_density_z +
+  age_65_over_z +
+  ethnic_minority_z +
+  factor(inner_outer_london) +
+  f(
+    area_id,
+    model = "bym2",
+    graph = g
+  )
+
+
+formula_60_pt <- access_score_60_pt ~
+  imd_z * suhii_z +
+  log_pop_density_z +
+  age_65_over_z +
+  ethnic_minority_z +
+  factor(inner_outer_london) +
+  f(
+    area_id,
+    model = "bym2",
+    graph = g
+  )
+
+
+formula_15_walk <- access_score_15_walk ~
+  imd_z * suhii_z +
+  log_pop_density_z +
+  age_65_over_z +
+  ethnic_minority_z +
+  factor(inner_outer_london) +
+  f(
+    area_id,
+    model = "bym2",
+    graph = g
+  )
+
+
+formula_60_walk <- access_score_60_walk ~
+  imd_z * suhii_z +
+  log_pop_density_z +
+  age_65_over_z +
+  ethnic_minority_z +
+  factor(inner_outer_london) +
+  f(
+    area_id,
+    model = "bym2",
+    graph = g
+  )
+
+
+formula_15_cycle <- access_score_15_cycle ~
+  imd_z * suhii_z +
+  log_pop_density_z +
+  age_65_over_z +
+  ethnic_minority_z +
+  factor(inner_outer_london) +
+  f(
+    area_id,
+    model = "bym2",
+    graph = g
+  )
+
+
+formula_60_cycle <- access_score_60_cycle ~
+  imd_z * suhii_z +
+  log_pop_density_z +
+  age_65_over_z +
+  ethnic_minority_z +
+  factor(inner_outer_london) +
+  f(
+    area_id,
+    model = "bym2",
+    graph = g
+  )
+```
+
+**15 pt**
+
+```{r}
+# run model
+model_15_pt_bym2 <- INLA::inla(
+  formula = formula_15_pt,
+  family = "poisson",
+  data = spatial_model_variables, # if not sf - sf::st_drop_geometry()
+  control.predictor = list(compute = TRUE),
+  control.compute = list(return.marginals.predictor = TRUE), 
+  verbose = FALSE
+)
+
+summary(model_15_pt_bym2)
+```
+
+**60 pt**
+
+```{r}
+# run model
+model_60_pt_bym2 <- INLA::inla(
+  formula = formula_60_pt,
+  family = "poisson",
+  data = spatial_model_variables, # if not sf - sf::st_drop_geometry()
+  control.predictor = list(compute = TRUE),
+  control.compute = list(return.marginals.predictor = TRUE), 
+  verbose = FALSE
+)
+
+summary(model_60_pt_bym2)
+```
+
+**15 walk**
+
+```{r}
+# run model
+model_15_walk_bym2 <- INLA::inla(
+  formula = formula_15_walk,
+  family = "poisson",
+  data = spatial_model_variables, # if not sf - sf::st_drop_geometry()
+  control.predictor = list(compute = TRUE),
+  control.compute = list(return.marginals.predictor = TRUE), 
+  verbose = FALSE
+)
+
+summary(model_15_walk_bym2)
+```
+
+**60 walk**
+
+```{r}
+# run model
+model_60_walk_bym2 <- INLA::inla(
+  formula = formula_60_walk,
+  family = "poisson",
+  data = spatial_model_variables, # if not sf - sf::st_drop_geometry()
+  control.predictor = list(compute = TRUE),
+  control.compute = list(return.marginals.predictor = TRUE), 
+  verbose = FALSE
+)
+
+summary(model_60_walk_bym2)
+```
+
+**15 cycle**
+
+```{r}
+# run model
+model_15_cycle_bym2 <- INLA::inla(
+  formula = formula_15_cycle,
+  family = "poisson",
+  data = spatial_model_variables, # if not sf - sf::st_drop_geometry()
+  control.predictor = list(compute = TRUE),
+  control.compute = list(return.marginals.predictor = TRUE), 
+  verbose = FALSE
+)
+
+summary(model_15_cycle_bym2)
+```
+
+**60 cycle**
+
+```{r}
+# run model
+model_60_cycle_bym2 <- INLA::inla(
+  formula = formula_60_cycle,
+  family = "poisson",
+  data = spatial_model_variables, # if not sf - sf::st_drop_geometry()
+  control.predictor = list(compute = TRUE),
+  control.compute = list(return.marginals.predictor = TRUE), 
+  verbose = FALSE
+)
+
+summary(model_60_cycle_bym2)
+```
+
+## 9. BiLISA - Bivariate LISA mapping
 
 well known method to address issues of spatial nonstationarity, allowing geographic variations in the relationships between dependent and explanatory variables.
