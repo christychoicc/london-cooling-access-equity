@@ -1194,7 +1194,7 @@ class(spatial_model_variables)
 ```{r}
 # from here onwards follow code from: 
 # https://www.r-inla.org/examples/AlvinBong/alvinbong-example.html, a tutorial that uses count-based areal data
-# and also
+# and also looked at 
 # https://www.sciencedirect.com/science/article/pii/S1353829225001765?via%3Dihub#sec2 --> https://github.com/mbcalles/Area-Level-Deprivation-Traffic-Injury
 
 # 1. Create a neighborhood list based on polygon contiguity - queens
@@ -1231,7 +1231,9 @@ formula_15_pt <- access_score_15_pt ~
   f(
     area_id,
     model = "bym2",
-    graph = g
+    graph = g,
+    constr = TRUE,
+    scale.model = TRUE
   )
 
 
@@ -1244,7 +1246,9 @@ formula_60_pt <- access_score_60_pt ~
   f(
     area_id,
     model = "bym2",
-    graph = g
+    graph = g,
+    constr = TRUE,
+    scale.model = TRUE
   )
 
 
@@ -1257,7 +1261,9 @@ formula_15_walk <- access_score_15_walk ~
   f(
     area_id,
     model = "bym2",
-    graph = g
+    graph = g,
+    constr = TRUE,
+    scale.model = TRUE
   )
 
 
@@ -1270,7 +1276,9 @@ formula_60_walk <- access_score_60_walk ~
   f(
     area_id,
     model = "bym2",
-    graph = g
+    graph = g,
+    constr = TRUE,
+    scale.model = TRUE
   )
 
 
@@ -1283,7 +1291,9 @@ formula_15_cycle <- access_score_15_cycle ~
   f(
     area_id,
     model = "bym2",
-    graph = g
+    graph = g,
+    constr = TRUE,
+    scale.model = TRUE
   )
 
 
@@ -1296,7 +1306,9 @@ formula_60_cycle <- access_score_60_cycle ~
   f(
     area_id,
     model = "bym2",
-    graph = g
+    graph = g,
+    constr = TRUE,
+    scale.model = TRUE
   )
 ```
 
@@ -1311,7 +1323,7 @@ model_15_pt_bym2 <- INLA::inla(
   control.predictor = list(compute = TRUE),
   # control.compute = list(return.marginals.predictor = TRUE), 
   # https://becarioprecario.bitbucket.io/inla-gitbook/ch-spatial.html#sec:lattice 
-  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE),
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
   verbose = FALSE
 )
 
@@ -1328,7 +1340,7 @@ model_60_pt_bym2 <- INLA::inla(
   data = spatial_model_variables,
   control.predictor = list(compute = TRUE),
   #control.compute = list(return.marginals.predictor = TRUE), 
-  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE),
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE,
   verbose = FALSE
 )
 
@@ -1345,7 +1357,7 @@ model_15_walk_bym2 <- INLA::inla(
   data = spatial_model_variables,
   control.predictor = list(compute = TRUE),
   #control.compute = list(return.marginals.predictor = TRUE), 
-  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE), 
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE), 
   verbose = FALSE
 )
 
@@ -1362,7 +1374,7 @@ model_60_walk_bym2 <- INLA::inla(
   data = spatial_model_variables, 
   control.predictor = list(compute = TRUE),
   #control.compute = list(return.marginals.predictor = TRUE), 
-  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE), 
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE), 
   verbose = FALSE
 )
 
@@ -1379,7 +1391,7 @@ model_15_cycle_bym2 <- INLA::inla(
   data = spatial_model_variables, 
   control.predictor = list(compute = TRUE),
   #control.compute = list(return.marginals.predictor = TRUE), 
-  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE),
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
   verbose = FALSE
 )
 
@@ -1396,11 +1408,64 @@ model_60_cycle_bym2 <- INLA::inla(
   data = spatial_model_variables,
   control.predictor = list(compute = TRUE),
   #control.compute = list(return.marginals.predictor = TRUE), 
-  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE), 
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE), 
   verbose = FALSE
 )
 
 summary(model_60_cycle_bym2)
+```
+
+#### 8.2.4. Validation Checks
+
+```{r}
+# check if grraph nodes matches LSOAs
+
+# Number of graph nodes
+cat("Number of graph nodes:", g$n, "\n")
+cat("Number of LSOAs:", nrow(spatial_model_variables), "\n")
+
+cat(
+  "Graph and data sizes match:",
+  g$n == nrow(spatial_model_variables),
+  "\n"
+)
+
+cat(
+  "area_id is correctly ordered:",
+  identical(
+    spatial_model_variables$area_id,
+    seq_len(nrow(spatial_model_variables))
+  ),
+  "\n"
+)
+
+cat(
+  "Number of duplicated LSOA codes:",
+  anyDuplicated(spatial_model_variables$lsoa21cd),
+  "\n"
+)
+```
+
+Observed-versus-fitted plot
+
+```{r}
+
+```
+
+Residuals plot and map
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+Residuals Moran's I
+
+```{r}
+
 ```
 
 ## 9. BiLISA - Bivariate LISA mapping
