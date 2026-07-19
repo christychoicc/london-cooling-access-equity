@@ -32,7 +32,8 @@ library(GGally)
 library(MASS)
 library(spatialreg)
 library(INLA)
-library(inlatools)
+library(INLAtools)
+library(performance)
 ```
 
 ## Data Loading
@@ -801,7 +802,7 @@ LLSOA.knn_4_weight <- LLSOA_knn %>%
 
 ### 7.1. access_score_15_pt
 
-```{r, eval=FALSE}
+```{r}
 # name object first
 model_15_pt <- models_poisson$access_score_15_pt
 # VIF
@@ -810,7 +811,7 @@ vif(model_15_pt)
 
 Ok, VIF values are all below 5 or 10, no problem with multicolinearity, next look at residuals (auto)correlation
 
-```{r, eval=FALSE}
+```{r}
 # residuals with pearson
 model_15_pt_resids <- residuals(model_15_pt, "pearson")
 
@@ -822,7 +823,7 @@ tmap_mode("view")
 qtm(model_profile, fill = "model_15_pt_resids")
 ```
 
-```{r, eval=FALSE}
+```{r}
 # queens case
 model_15_pt_resids_queen <- model_profile %>%
   st_drop_geometry()%>%
@@ -834,7 +835,7 @@ model_15_pt_resids_queen <- model_profile %>%
 model_15_pt_resids_queen
 ```
 
-```{r, eval=FALSE}
+```{r}
 # nearest neighbour
 model_15_pt_resids_nearest_neighbour <- model_profile %>%
   st_drop_geometry()%>%
@@ -848,7 +849,7 @@ model_15_pt_resids_nearest_neighbour
 
 ### 7.2. access_score_60_pt
 
-```{r, eval=FALSE}
+```{r}
 # name object first
 model_60_pt <- models_nb$access_score_60_pt
 
@@ -858,7 +859,7 @@ vif(model_60_pt)
 
 **Residuals and Map**
 
-```{r, eval=FALSE}
+```{r}
 # residuals with pearson
 model_60_pt_resids <- residuals(model_60_pt, "pearson")
 
@@ -872,7 +873,7 @@ qtm(model_profile, fill = "model_60_pt_resids")
 
 **Moran's I - Queens Case**
 
-```{r, eval=FALSE}
+```{r}
 # queens case
 model_60_pt_resids_queen <- model_profile %>%
   st_drop_geometry()%>%
@@ -886,7 +887,7 @@ model_60_pt_resids_queen
 
 **Moran's I - 4 Nearest Neighbours**
 
-```{r, eval=FALSE}
+```{r}
 # nearest neighbour
 model_60_pt_resids_nearest_neighbour <- model_profile %>%
   st_drop_geometry()%>%
@@ -900,7 +901,7 @@ model_60_pt_resids_nearest_neighbour
 
 ### 7.3. access_score_15_walk (Poisson)
 
-```{r, eval=FALSE}
+```{r}
 # name object first
 model_15_walk <- models_poisson$access_score_15_walk
 # VIF
@@ -909,7 +910,7 @@ vif(model_15_walk)
 
 **Residuals and Map**
 
-```{r, eval=FALSE}
+```{r}
 # residuals with pearson
 model_15_walk_resids <- residuals(model_15_walk, "pearson")
 
@@ -923,7 +924,7 @@ qtm(model_profile, fill = "model_15_walk_resids")
 
 **Moran's I - Queens Case**
 
-```{r, eval=FALSE}
+```{r}
 # queens case
 model_15_walk_resids_queen <- model_profile %>%
   st_drop_geometry()%>%
@@ -937,7 +938,7 @@ model_15_walk_resids_queen
 
 **Moran's I - 4 Nearest Neighbours**
 
-```{r, eval=FALSE}
+```{r}
 # nearest neighbour
 model_15_walk_resids_nearest_neighbour <- model_profile %>%
   st_drop_geometry()%>%
@@ -951,7 +952,7 @@ model_15_walk_resids_nearest_neighbour
 
 ### 7.4. access_score_60_walk
 
-```{r, eval=FALSE}
+```{r}
 # name object first
 model_60_walk <- models_nb$access_score_60_walk
 # VIF
@@ -960,7 +961,7 @@ vif(model_60_walk)
 
 **Residuals and Map**
 
-```{r, eval=FALSE}
+```{r}
 # residuals with pearson 
 model_60_walk_resids <- residuals(model_60_walk, "pearson")  
 
@@ -974,7 +975,7 @@ qtm(model_profile, fill = "model_60_walk_resids")
 
 **Moran's I - Queens Case**
 
-```{r, eval=FALSE}
+```{r}
 # queens case 
 model_60_walk_resids_queen <- model_profile %>%   
   st_drop_geometry()%>%   
@@ -988,7 +989,7 @@ model_60_walk_resids_queen
 
 **Moran's I - 4 Nearest Neighbours**
 
-```{r, eval=FALSE}
+```{r}
 # nearest neighbour 
 model_60_walk_resids_nearest_neighbour <- model_profile %>%   
   st_drop_geometry()%>%   
@@ -1002,7 +1003,7 @@ model_60_walk_resids_nearest_neighbour
 
 ### 7.5. access_score_15_cycle
 
-```{r, eval=FALSE}
+```{r}
 # name object first
 model_15_cycle <- models_nb$access_score_15_cycle
 # VIF
@@ -1011,7 +1012,7 @@ vif(model_15_cycle)
 
 **Residuals and Map**
 
-```{r, eval=FALSE}
+```{r}
 # residuals with pearson  
 model_15_cycle_resids <- residuals(model_15_cycle, "pearson")    
 
@@ -1025,7 +1026,7 @@ qtm(model_profile, fill = "model_15_cycle_resids")
 
 **Moran's I - Queens Case**
 
-```{r, eval=FALSE}
+```{r}
 # queens case  
 model_15_cycle_resids_queen <- model_profile %>%      
   st_drop_geometry()%>%      
@@ -1039,7 +1040,7 @@ model_15_cycle_resids_queen
 
 **Moran's I - 4 Nearest Neighbours**
 
-```{r, eval=FALSE}
+```{r}
 # nearest neighbour  
 model_15_cycle_resids_nearest_neighbour <- model_profile %>%      
   st_drop_geometry()%>%      
@@ -1053,7 +1054,7 @@ model_15_cycle_resids_nearest_neighbour
 
 ### 7.6. access_score_60_cycle
 
-```{r, eval=FALSE}
+```{r}
 # name object first
 model_60_cycle <- models_nb$access_score_60_cycle
 # VIF
@@ -1062,7 +1063,7 @@ vif(model_60_cycle)
 
 **Residuals and Map**
 
-```{r, eval=FALSE}
+```{r}
 # residuals with pearson   
 model_60_cycle_resids <- residuals(model_60_cycle, "pearson")      
 
@@ -1076,7 +1077,7 @@ qtm(model_profile, fill = "model_60_cycle_resids")
 
 **Moran's I - Queens Case**
 
-```{r, eval=FALSE}
+```{r}
 # queens case   
 model_60_cycle_resids_queen <- model_profile %>%         
   st_drop_geometry()%>%         
@@ -1090,7 +1091,7 @@ model_60_cycle_resids_queen
 
 **Moran's I - 4 Nearest Neighbours**
 
-```{r, eval=FALSE}
+```{r}
 # nearest neighbour   
 model_60_cycle_resids_nearest_neighbour <- model_profile %>%         
   st_drop_geometry()%>%         
@@ -1178,7 +1179,7 @@ class(spatial_model_variables)
 # and also looked at 
 # https://www.sciencedirect.com/science/article/pii/S1353829225001765?via%3Dihub#sec2 --> https://github.com/mbcalles/Area-Level-Deprivation-Traffic-Injury
 
-library(INLA)
+# library(INLA)
 
 # 1. Create a neighborhood list based on polygon contiguity - queens
 nb <- spdep::poly2nb(
@@ -1196,7 +1197,7 @@ map.adj <- file.path(getwd(), "map.graph")
 g <- inla.read.graph(filename = map.adj)
 ```
 
-### 8.2. Inla call/ fit
+### 8.2. Inla call/ fit - Generalised Linear Models (Poisson)
 
 ```{r}
 # index for spatial effects
@@ -1380,7 +1381,7 @@ summary(model_60_walk_bym2)
 # run model
 model_15_cycle_bym2 <- INLA::inla(
   formula = formula_15_cycle,
-  family = "nbinomial",
+  family = "poisson",
   data = spatial_model_variables, 
   control.predictor = list(compute = TRUE),
   #control.compute = list(return.marginals.predictor = TRUE), 
@@ -1410,6 +1411,57 @@ model_60_cycle_bym2 <- INLA::inla(
 summary(model_60_cycle_bym2)
 ```
 
+```{r}
+# 1. Named list with self-explanatory labels
+bym2_models <- list(
+  "Model 1" = model_15_pt_bym2,
+  "Model 2" = model_60_pt_bym2,
+  "Model 3" = model_15_walk_bym2,
+  "Model 4" = model_60_walk_bym2,
+  "Model 5" = model_15_cycle_bym2,
+  "Model 6" = model_60_cycle_bym2
+)
+
+# 2. Readable variable names (order here = row order in the table)
+variable_labels <- c(
+  "(Intercept)" = "Intercept",
+  "imd_z" = "IMD (z)",
+  "suhii_z" = "SUHII (z)",
+  "imd_z:suhii_z" = "IMD × SUHII",
+  "log_pop_density_z" = "Log pop. density (z)",
+  "age_4_under_z" = "Age 4 or under % (z)",                 
+  "age_65_over_z" = "Age 65 or over % (z)",
+  "ethnic_minority_z" = "Ethnic minority % (z)",
+  "factor(inner_outer_london)Inner" = "Inner, Outer London"
+)
+
+# 3. Extract fixed effects, exponentiate to rate ratios, format as one cell
+# just like this: https://www.sciencedirect.com/science/article/pii/S2405673123000144?utm_source=chatgpt.com
+fixed_effects_long <- lapply(names(bym2_models), function(model_name) {
+  bym2_models[[model_name]]$summary.fixed %>%
+    as.data.frame() %>%
+    rownames_to_column("term") %>%
+    transmute(
+      model = model_name,
+      variable = variable_labels[term],
+      cell = sprintf(
+        "%.3f (%.3f, %.3f)",
+        exp(`0.5quant`), exp(`0.025quant`), exp(`0.975quant`)
+      )
+    )
+}) %>% bind_rows()
+
+# 4. One column per model, one row per variable
+fixed_effects_table <- fixed_effects_long %>%
+  pivot_wider(names_from = model, values_from = cell) %>%
+  arrange(match(variable, variable_labels))
+
+knitr::kable(
+  fixed_effects_table,
+  caption = "BYM2 fixed effects: Rate Ratios and 95% Credible Intervals (CI)"
+)
+```
+
 ### 8.3. Validation Checks
 
 #### 8.3.1. Predictive Diagnostic Methods - CPO and PIT for all models
@@ -1417,7 +1469,7 @@ summary(model_60_cycle_bym2)
 Predictive measures can be used both to validate and to compare models and using marginal... DIC and CPO and PIT (Referencing from here: <https://www.math.ntnu.no/preprint/statistics/2008/S2-2008.pdf>)
 
 ```{r}
-# List the six models
+# List the current six models
 six_models <- list(
   "15_pt"    = model_15_pt_bym2,
   "60_pt"    = model_60_pt_bym2,
@@ -1524,9 +1576,18 @@ LLSOA.knn_4_weight2 <- LLSOA_knn2 %>%
   nb2listw(., style="W")
 ```
 
+**Pearson Residuals - i = (Y_i − λ̂\_i) / sqrt(λ̂\_i)**
+
+**15 pt**
+
 ```{r}
-# residuals with pearson
-model_15_pt_bym2_resids <- residuals(model_15_pt_bym2, "pearson")
+model_15_pt_bym2_resids <- (
+  # observed minus 
+  spatial_model_variables$access_score_15_pt -
+    # fitted value
+    model_15_pt_bym2$summary.fitted.values$mean
+  # divided by square root of fitted values
+)/sqrt(model_15_pt_bym2$summary.fitted.values$mean)
 
 model_profile <- spatial_model_variables %>%
   mutate(model_15_pt_bym2_resids)
@@ -1536,6 +1597,246 @@ tmap_mode("view")
 qtm(model_profile, fill = "model_15_pt_bym2_resids")
 ```
 
+```{r}
+# queens case
+model_15_pt_bym2_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_pt_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight2)%>%
+  tidy()
+
+model_15_pt_bym2_resids_queen
+```
+
+```{r}
+# nearest neighbour
+model_15_pt_bym2_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_pt_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight2)%>%
+  tidy()
+
+model_15_pt_bym2_resids_nearest_neighbour
+```
+
+**60 pt**
+
+```{r}
+model_60_pt_bym2_resids <- (
+  spatial_model_variables$access_score_60_pt -
+    model_60_pt_bym2$summary.fitted.values$mean
+)/sqrt(model_60_pt_bym2$summary.fitted.values$mean)
+
+model_profile <- spatial_model_variables %>%
+  mutate(model_60_pt_bym2_resids)
+
+#now plot the residuals
+tmap_mode("view")
+qtm(model_profile, fill = "model_60_pt_bym2_resids")
+```
+
+```{r}
+# queens case
+model_60_pt_bym2_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_pt_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight2)%>%
+  tidy()
+
+model_60_pt_bym2_resids_queen
+```
+
+```{r}
+# nearest neighbour
+model_60_pt_bym2_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_pt_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight2)%>%
+  tidy()
+
+model_60_pt_bym2_resids_nearest_neighbour
+```
+
+**15 walk**
+
+```{r}
+model_15_walk_bym2_resids <- (
+  spatial_model_variables$access_score_15_walk -
+    model_15_walk_bym2$summary.fitted.values$mean
+)/sqrt(model_15_walk_bym2$summary.fitted.values$mean)
+
+model_profile <- spatial_model_variables %>%
+  mutate(model_15_walk_bym2_resids)
+
+#now plot the residuals
+tmap_mode("view")
+qtm(model_profile, fill = "model_15_walk_bym2_resids")
+```
+
+```{r}
+# queens case
+model_15_walk_bym2_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_walk_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight2)%>%
+  tidy()
+
+model_15_walk_bym2_resids_queen
+```
+
+```{r}
+# nearest neighbour
+model_15_walk_bym2_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_walk_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight2)%>%
+  tidy()
+
+model_15_walk_bym2_resids_nearest_neighbour
+```
+
+**60 walk**
+
+```{r}
+model_60_walk_bym2_resids <- (
+  spatial_model_variables$access_score_60_walk -
+    model_60_walk_bym2$summary.fitted.values$mean
+)/sqrt(model_60_walk_bym2$summary.fitted.values$mean)
+
+model_profile <- spatial_model_variables %>%
+  mutate(model_60_walk_bym2_resids)
+
+#now plot the residuals
+tmap_mode("view")
+qtm(model_profile, fill = "model_60_walk_bym2_resids")
+```
+
+```{r}
+# queens case
+model_60_walk_bym2_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_walk_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight2)%>%
+  tidy()
+
+model_60_walk_bym2_resids_queen
+```
+
+```{r}
+# nearest neighbour
+model_60_walk_bym2_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_walk_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight2)%>%
+  tidy()
+
+model_60_walk_bym2_resids_nearest_neighbour
+```
+
+**15 cycle**
+
+```{r}
+model_15_cycle_bym2_resids <- (
+  spatial_model_variables$access_score_15_cycle -
+    model_15_cycle_bym2$summary.fitted.values$mean
+)/sqrt(model_15_cycle_bym2$summary.fitted.values$mean)
+
+model_profile <- spatial_model_variables %>%
+  mutate(model_15_cycle_bym2_resids)
+
+#now plot the residuals
+tmap_mode("view")
+qtm(model_profile, fill = "model_15_cycle_bym2_resids")
+```
+
+```{r}
+# queens case
+model_15_cycle_bym2_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_cycle_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight2)%>%
+  tidy()
+
+model_15_cycle_bym2_resids_queen
+```
+
+```{r}
+# nearest neighbour
+model_15_cycle_bym2_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_cycle_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight2)%>%
+  tidy()
+
+model_15_cycle_bym2_resids_nearest_neighbour
+```
+
+**60 cycle**
+
+```{r}
+model_60_cycle_bym2_resids <- (
+  spatial_model_variables$access_score_60_cycle -
+    model_60_cycle_bym2$summary.fitted.values$mean
+)/sqrt(model_60_cycle_bym2$summary.fitted.values$mean)
+
+model_profile <- spatial_model_variables %>%
+  mutate(model_60_cycle_bym2_resids)
+
+#now plot the residuals
+tmap_mode("view")
+qtm(model_profile, fill = "model_60_cycle_bym2_resids")
+```
+
+```{r}
+# queens case
+model_60_cycle_bym2_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_cycle_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight2)%>%
+  tidy()
+
+model_60_cycle_bym2_resids_queen
+```
+
+```{r}
+# nearest neighbour
+model_60_cycle_bym2_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_cycle_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight2)%>%
+  tidy()
+
+model_60_cycle_bym2_resids_nearest_neighbour
+```
+
 ## 9. BiLISA - Bivariate LISA mapping
 
-well known method to address issues of spatial nonstationarity, allowing geographic variations in the relationships between dependent and explanatory variables.
+well known method to address issues of spatial nonstationarity, allowing geographic variations in the relationships between dependent and explanatory variables.\
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
