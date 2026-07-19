@@ -40,6 +40,12 @@ library(performance)
 
 Clean names, select initial needed columns and rename columns for consistency across datasets
 
+**Greater London Boundary:**
+
+```{r}
+london_boundary <- st_read("data/gla/London_GLA_Boundary.shp")
+```
+
 **London only LSOAs**
 
 ```{r}
@@ -1823,19 +1829,167 @@ model_60_cycle_bym2_resids_nearest_neighbour
 
 ## 9. BiLISA - Bivariate LISA mapping
 
-well known method to address issues of spatial nonstationarity, allowing geographic variations in the relationships between dependent and explanatory variables.\
+Well known method to address issues of spatial nonstationarity, allowing geographic variations in the relationships between dependent and explanatory variables –\> use `sepdep` package
+
+Each of the six dependent variables will be mapped with IMD and SUHII respectively:
 
 ```{r}
+bilisa_variables <- spatial_model_variables %>%
+  arrange(lsoa21cd)
 
+# Create Queen-contiguity neighbours
+bilisa_nb <- bilisa_variables %>%
+  poly2nb(.,queen = T)
+
+bilisa_weights <-  bilisa_nb %>%
+  nb2listw(.,style = "W",)
+```
+
+### 9.1. 15 pt 
+
+**access and suhii**
+
+```{r}
+# https://r-spatial.github.io/spdep/reference/localmoran_bv.html
+
+bilisa_15_pt <- localmoran_bv(
+  x = bilisa_variables$access_score_15_pt,
+  y = bilisa_variables$suhii_z,
+  listw = bilisa_weights,
+  nsim = 199,
+  scale = TRUE,
+  alternative = "two.sided",
+  iseed = 42,
+  zero.policy = TRUE
+)
+
+head(bilisa_15_pt)
 ```
 
 ```{r}
-
+bilisa_cluster <- spdep::hotspot(
+  bilisa_15_pt,
+  Prname = "Pr(folded) Sim",
+  cutoff = 0.05,
+  quadrant.type = "pysal",
+  p.adjust = "none"
+)
 ```
 
 ```{r}
+bilisa_variables$bilisa_cluster <- as.character(
+  bilisa_cluster
+)
 
+bilisa_variables$bilisa_cluster[
+  is.na(bilisa_variables$bilisa_cluster)
+] <- "Not significant"
 ```
+
+```{r}
+table(bilisa_variables$bilisa_cluster)
+```
+
+```{r}
+tmap_mode("plot")
+
+tm_shape(bilisa_variables) +
+  tm_polygons(
+    fill = "bilisa_cluster",
+    fill.scale = tm_scale_categorical(),
+    fill.legend = tm_legend(
+      title = "BiLISA Cluster"
+    ),
+    col = NA
+  ) +
+  tm_title(
+    "15-minute Public Transit Accessibility and SUHII"
+  )
+```
+
+```{r}
+# reorder clusters and make better labels
+bilisa_variables <- bilisa_variables %>%
+  mutate(
+    bilisa_cluster_plot = case_when(
+      bilisa_cluster == "Low-High" ~ "Low access–High SUHII",
+      bilisa_cluster == "High-High" ~ "High access–High SUHII",
+      bilisa_cluster == "Low-Low" ~ "Low access–Low SUHII",
+      bilisa_cluster == "High-Low" ~ "High access–Low SUHII",
+      TRUE ~ NA_character_
+    )
+  )
+
+# set legend order
+bilisa_variables$bilisa_cluster_plot <- factor(
+  bilisa_variables$bilisa_cluster_plot,
+  levels = c(
+    "Low access–High SUHII",
+    "High access–High SUHII",
+    "Low access–Low SUHII",
+    "High access–Low SUHII"
+  )
+)
+
+
+cluster_cols <- c(
+  "Low access–High SUHII"  = "#D73027",  # red
+  "High access–High SUHII" = "#F4A582",  # light red / salmon
+  "Low access–Low SUHII"   = "#91BFDB",  # light blue
+  "High access–Low SUHII"  = "#4575B4"   # blue
+)
+```
+
+```{r}
+tmap_mode("plot")
+
+bilisa_15_pt_suhii_map <-
+  # Base: all LSOAs white
+  tm_shape(bilisa_variables) +
+  tm_fill(
+    fill = "white"
+  ) +
+
+  # Significant clusters
+  tm_shape(
+    dplyr::filter(
+      bilisa_variables,
+      !is.na(bilisa_cluster_plot)
+    )
+  ) +
+  tm_fill(
+    fill = "bilisa_cluster_plot",
+    fill.scale = tm_scale_categorical(
+      values = cluster_cols
+    ),
+    fill.legend = tm_legend(
+      title = "BiLISA cluster",
+      position = tm_pos_out("right", "center"),
+      frame = FALSE
+    )
+  ) +
+
+  # London boundary must come last
+  tm_shape(london_boundary) +
+  tm_borders(
+    col = "grey30",
+    lwd = 1
+  ) +
+
+  tm_title(
+    "15-minute public transport accessibility\nand neighbouring SUHII"
+  ) +
+
+  tm_layout(
+    frame = FALSE,
+    bg.color = "white",
+    outer.margins = 0.02
+  )
+
+bilisa_15_pt_suhii_map 
+```
+
+**access and imd**
 
 ```{r}
 
