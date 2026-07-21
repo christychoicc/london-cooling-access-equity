@@ -1501,44 +1501,6 @@ knitr::kable(
 )
 ```
 
-Check CPO failures
-
-```{r}
-bym2_models <- list(
-  "15-minute Public Transit" = model_15_pt_bym2,
-  "60-minute Public Transit" = model_60_pt_bym2,
-  "15-minute Walking" = model_15_walk_bym2,
-  "60-minute Walking" = model_60_walk_bym2,
-  "15-minute Cycling" = model_15_cycle_bym2,
-  "60-minute Cycling" = model_60_cycle_bym2
-)
-
-cpo_failure_counts <- sapply(
-  bym2_models,
-  function(model) sum(model$cpo$failure > 0, na.rm = TRUE)
-)
-
-cpo_failure_counts
-```
-
-```{r, evall=FALSE}
-model_15_pt_bym2_cpo <- INLA::inla.cpo(
-  model_15_pt_bym2
-)
-
-model_15_walk_bym2_cpo <- INLA::inla.cpo(
-  model_15_walk_bym2
-)
-
-model_15_cycle_bym2_cpo <- INLA::inla.cpo(
-  model_15_cycle_bym2
-)
-
-sum(log(model_15_pt_bym2_cpo$cpo$cpo), na.rm = TRUE)
-sum(log(model_15_walk_bym2_cpo$cpo$cpo), na.rm = TRUE)
-sum(log(model_15_cycle_bym2_cpo$cpo$cpo), na.rm = TRUE)
-```
-
 ### 8.3. Validation Checks
 
 #### 8.3.1. Predictive Diagnostic Methods - CPO and PIT for all models
@@ -1608,7 +1570,46 @@ cat(
 )
 ```
 
-#### 8.3.2. Residuals
+#### 8.3.2. CPO failures
+
+```{r}
+bym2_models <- list(
+  "15-minute Public Transit" = model_15_pt_bym2,
+  "60-minute Public Transit" = model_60_pt_bym2,
+  "15-minute Walking" = model_15_walk_bym2,
+  "60-minute Walking" = model_60_walk_bym2,
+  "15-minute Cycling" = model_15_cycle_bym2,
+  "60-minute Cycling" = model_60_cycle_bym2
+)
+
+cpo_failure_counts <- sapply(
+  bym2_models,
+  function(model) sum(model$cpo$failure > 0, na.rm = TRUE)
+)
+
+cpo_failure_counts
+```
+
+```{r, eval=FALSE}
+# recompute
+model_15_pt_bym2_cpo <- INLA::inla.cpo(
+  model_15_pt_bym2
+)
+
+model_15_walk_bym2_cpo <- INLA::inla.cpo(
+  model_15_walk_bym2
+)
+
+model_15_cycle_bym2_cpo <- INLA::inla.cpo(
+  model_15_cycle_bym2
+)
+
+sum(log(model_15_pt_bym2_cpo$cpo$cpo), na.rm = TRUE)
+sum(log(model_15_walk_bym2_cpo$cpo$cpo), na.rm = TRUE)
+sum(log(model_15_cycle_bym2_cpo$cpo$cpo), na.rm = TRUE)
+```
+
+#### 8.3.3. Residuals
 
 Rebuild the centroids, queens, knn first
 
