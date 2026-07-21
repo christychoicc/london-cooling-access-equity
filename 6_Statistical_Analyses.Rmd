@@ -574,6 +574,39 @@ corrplot(
 dev.off()
 ```
 
+```{r}
+outcomes <- c(
+  "access_score_15_pt",
+  "access_score_60_pt",
+  "access_score_15_walk",
+  "access_score_60_walk",
+  "access_score_15_cycle",
+  "access_score_60_cycle"
+)
+
+distribution_check <- do.call(
+  rbind,
+  lapply(outcomes, function(v) {
+
+    y <- london_join[[v]]
+
+    data.frame(
+      outcome = v,
+      n = sum(!is.na(y)),
+      mean = mean(y, na.rm = TRUE),
+      variance = var(y, na.rm = TRUE),
+      variance_mean_ratio = var(y, na.rm = TRUE) /
+        mean(y, na.rm = TRUE),
+      zeros = sum(y == 0, na.rm = TRUE),
+      zero_percent = mean(y == 0, na.rm = TRUE) * 100,
+      maximum = max(y, na.rm = TRUE)
+    )
+  })
+)
+
+distribution_check
+```
+
 ### Transform Variables
 
 **Log transform population density and standardise other variables for clean interpretation**
@@ -1324,7 +1357,7 @@ model_15_pt_bym2 <- INLA::inla(
   verbose = FALSE
 )
 
-summary(model_15_pt_bym2)
+#summary(model_15_pt_bym2)
 ```
 
 **60 pt**
@@ -1342,7 +1375,7 @@ model_60_pt_bym2 <- INLA::inla(
   verbose = FALSE
 )
 
-summary(model_60_pt_bym2)
+#summary(model_60_pt_bym2)
 ```
 
 **15 walk**
@@ -1360,7 +1393,7 @@ model_15_walk_bym2 <- INLA::inla(
   verbose = FALSE
 )
 
-summary(model_15_walk_bym2)
+#summary(model_15_walk_bym2)
 ```
 
 **60 walk**
@@ -1378,7 +1411,7 @@ model_60_walk_bym2 <- INLA::inla(
   verbose = FALSE
 )
 
-summary(model_60_walk_bym2)
+#summary(model_60_walk_bym2)
 ```
 
 **15 cycle**
@@ -1387,7 +1420,7 @@ summary(model_60_walk_bym2)
 # run model
 model_15_cycle_bym2 <- INLA::inla(
   formula = formula_15_cycle,
-  family = "poisson",
+  family = "nbinomial",
   data = spatial_model_variables, 
   control.predictor = list(compute = TRUE),
   #control.compute = list(return.marginals.predictor = TRUE), 
@@ -1414,7 +1447,7 @@ model_60_cycle_bym2 <- INLA::inla(
   verbose = FALSE
 )
 
-summary(model_60_cycle_bym2)
+#summary(model_60_cycle_bym2)
 ```
 
 ```{r}
@@ -1466,6 +1499,44 @@ knitr::kable(
   fixed_effects_table,
   caption = "BYM2 fixed effects: Rate Ratios and 95% Credible Intervals (CI)"
 )
+```
+
+Check CPO failures
+
+```{r}
+bym2_models <- list(
+  "15-minute Public Transit" = model_15_pt_bym2,
+  "60-minute Public Transit" = model_60_pt_bym2,
+  "15-minute Walking" = model_15_walk_bym2,
+  "60-minute Walking" = model_60_walk_bym2,
+  "15-minute Cycling" = model_15_cycle_bym2,
+  "60-minute Cycling" = model_60_cycle_bym2
+)
+
+cpo_failure_counts <- sapply(
+  bym2_models,
+  function(model) sum(model$cpo$failure > 0, na.rm = TRUE)
+)
+
+cpo_failure_counts
+```
+
+```{r, evall=FALSE}
+model_15_pt_bym2_cpo <- INLA::inla.cpo(
+  model_15_pt_bym2
+)
+
+model_15_walk_bym2_cpo <- INLA::inla.cpo(
+  model_15_walk_bym2
+)
+
+model_15_cycle_bym2_cpo <- INLA::inla.cpo(
+  model_15_cycle_bym2
+)
+
+sum(log(model_15_pt_bym2_cpo$cpo$cpo), na.rm = TRUE)
+sum(log(model_15_walk_bym2_cpo$cpo$cpo), na.rm = TRUE)
+sum(log(model_15_cycle_bym2_cpo$cpo$cpo), na.rm = TRUE)
 ```
 
 ### 8.3. Validation Checks
@@ -1845,14 +1916,12 @@ bilisa_weights <-  bilisa_nb %>%
   nb2listw(.,style = "W",)
 ```
 
-### 9.1. 15 pt 
-
-**access and suhii**
+### 9.1. Map SUHII
 
 ```{r}
 # https://r-spatial.github.io/spdep/reference/localmoran_bv.html
 
-bilisa_15_pt <- localmoran_bv(
+bilisa_15_pt_suhii <- localmoran_bv(
   x = bilisa_variables$access_score_15_pt,
   y = bilisa_variables$suhii_z,
   listw = bilisa_weights,
@@ -1863,12 +1932,12 @@ bilisa_15_pt <- localmoran_bv(
   zero.policy = TRUE
 )
 
-head(bilisa_15_pt)
+head(bilisa_15_pt_suhii)
 ```
 
 ```{r}
 bilisa_cluster <- spdep::hotspot(
-  bilisa_15_pt,
+  bilisa_15_pt_suhii,
   Prname = "Pr(folded) Sim",
   cutoff = 0.05,
   quadrant.type = "pysal",
@@ -1943,7 +2012,7 @@ cluster_cols <- c(
 ```{r}
 tmap_mode("plot")
 
-bilisa_15_pt_suhii_map <-
+bilisa_15_pt_suhii_suhii_map <-
   # Base: all LSOAs white
   tm_shape(bilisa_variables) +
   tm_fill(
@@ -1986,11 +2055,555 @@ bilisa_15_pt_suhii_map <-
     outer.margins = 0.02
   )
 
-bilisa_15_pt_suhii_map 
+bilisa_15_pt_suhii_suhii_map 
 ```
 
-**access and imd**
+**Loop over maps:**
 
 ```{r}
+run_bilisa_map <- function(
+    data,
+    access_var,
+    context_var,
+    context_label,
+    map_title,
+    listw = bilisa_weights,
+    boundary = london_boundary,
+    nsim = 199,
+    seed = 42,
+    show_legend = TRUE
+) {
 
+  # Standardise only the accessibility variable
+  access_z <- as.numeric(
+    scale(data[[access_var]])
+  )
+
+  # SUHII or IMD is already a z-score
+  context_z <- data[[context_var]]
+
+  # Check that both variables and weights have matching lengths
+  stopifnot(
+    length(access_z) == length(context_z),
+    length(access_z) == length(listw$neighbours)
+  )
+
+  # Bivariate Local Moran's I
+  lisa_result <- spdep::localmoran_bv(
+    x = access_z,
+    y = context_z,
+    listw = listw,
+    nsim = nsim,
+    scale = FALSE,
+    alternative = "two.sided",
+    iseed = seed,
+    zero.policy = TRUE
+  )
+
+  # Significant cluster classification
+  lisa_cluster <- spdep::hotspot(
+    lisa_result,
+    Prname = "Pr(folded) Sim",
+    cutoff = 0.05,
+    quadrant.type = "pysal",
+    p.adjust = "none"
+  )
+
+  # Full, readable cluster labels
+  cluster_labels <- c(
+    "Low-High" =
+      paste0("Low access–High ", context_label),
+
+    "High-High" =
+      paste0("High access–High ", context_label),
+
+    "Low-Low" =
+      paste0("Low access–Low ", context_label),
+
+    "High-Low" =
+      paste0("High access–Low ", context_label)
+  )
+
+  cluster_levels <- unname(
+    cluster_labels[
+      c(
+        "Low-High",
+        "High-High",
+        "Low-Low",
+        "High-Low"
+      )
+    ]
+  )
+
+  cluster_colours <- stats::setNames(
+    c(
+      "#D73027",  # Low-High
+      "#F4A582",  # High-High
+      "#91BFDB",  # Low-Low
+      "#4575B4"   # High-Low
+    ),
+    cluster_levels
+  )
+
+  # Create a separate result dataset
+  result_data <- data %>%
+    dplyr::mutate(
+      bilisa_i = as.numeric(lisa_result[, 1]),
+
+      bilisa_p = as.numeric(
+        lisa_result[, "Pr(folded) Sim"]
+      ),
+
+      bilisa_cluster = as.character(
+        lisa_cluster
+      ),
+
+      bilisa_cluster_plot = unname(
+        cluster_labels[bilisa_cluster]
+      ),
+
+      bilisa_cluster_plot = factor(
+        bilisa_cluster_plot,
+        levels = cluster_levels
+      )
+    )
+
+  # Significant areas only
+  significant_data <- result_data %>%
+    dplyr::filter(
+      !is.na(bilisa_cluster_plot)
+    )
+
+  # Show or hide the legend
+  legend_setting <- if (show_legend) {
+    tm_legend(
+      title = "BiLISA cluster",
+      position = tm_pos_out("right", "center"),
+      frame = FALSE
+    )
+  } else {
+    tm_legend_hide()
+  }
+
+  # Create the map
+  map_object <-
+    tm_shape(result_data) +
+    tm_fill(
+      fill = "white"
+    ) +
+
+    tm_shape(significant_data) +
+    tm_fill(
+      fill = "bilisa_cluster_plot",
+
+      fill.scale = tm_scale_categorical(
+        values = cluster_colours
+      ),
+
+      fill.legend = legend_setting
+    ) +
+
+    # London boundary last
+    tm_shape(boundary) +
+    tm_borders(
+      col = "grey30",
+      lwd = 1
+    ) +
+
+    tm_title(
+      map_title
+    ) +
+
+    tm_layout(
+      frame = FALSE,
+      bg.color = "white",
+      outer.margins = 0.02
+    )
+
+  # Return everything
+  list(
+    result = lisa_result,
+    clusters = lisa_cluster,
+    data = result_data,
+    map = map_object
+  )
+}
+```
+
+```{r}
+bilisa_15_pt_suhii <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_15_pt",
+  context_var = "suhii_z",
+  context_label = "SUHII",
+  map_title =
+    "15-minute Public Transit Accessibility and SUHII",
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_15_pt_suhii_map <- bilisa_15_pt_suhii$map
+
+# plot
+bilisa_15_pt_suhii_map
+```
+
+```{r}
+bilisa_60_pt_suhii <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_60_pt",
+  context_var = "suhii_z",
+  context_label = "SUHII",
+  map_title =
+    "60-minute Public Transit Accessibility and SUHII",
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_60_pt_suhii_map <- bilisa_60_pt_suhii$map
+
+# plot
+bilisa_60_pt_suhii_map
+```
+
+```{r}
+bilisa_15_walk_suhii <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_15_walk",
+  context_var = "suhii_z",
+  context_label = "SUHII",
+  map_title =
+    "15-minute Walking Accessibility and SUHII",
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_15_walk_suhii_map <- bilisa_15_walk_suhii$map
+
+# plot
+bilisa_15_walk_suhii_map
+```
+
+```{r}
+bilisa_60_walk_suhii <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_60_walk",
+  context_var = "suhii_z",
+  context_label = "SUHII",
+  map_title =
+    "60-minute Walking Accessibility and SUHII",
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_60_walk_suhii_map <- bilisa_60_walk_suhii$map
+
+# plot
+bilisa_60_walk_suhii_map
+```
+
+```{r}
+bilisa_15_cycle_suhii <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_15_cycle",
+  context_var = "suhii_z",
+  context_label = "SUHII",
+  map_title =
+    "15-minute Cycling Accessibility and SUHII",
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_15_cycle_suhii_map <- bilisa_15_cycle_suhii$map
+
+# plot
+bilisa_15_cycle_suhii_map
+```
+
+```{r}
+bilisa_60_cycle_suhii <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_60_cycle",
+  context_var = "suhii_z",
+  context_label = "SUHII",
+  map_title =
+    "60-minute Cycling Accessibility and SUHII",
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_60_cycle_suhii_map <- bilisa_60_cycle_suhii$map
+
+# plot
+bilisa_60_cycle_suhii_map
+```
+
+```{r}
+bilisa_15_pt_imd <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_15_pt",
+  context_var = "imd_z",
+  context_label = "IMD",
+  map_title =
+    "15-minute Public Transit Accessibility and IMD",
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_15_pt_imd_map <- bilisa_15_pt_imd$map
+
+# plot
+bilisa_15_pt_imd_map
+```
+
+```{r}
+bilisa_60_pt_imd <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_60_pt",
+  context_var = "imd_z",
+  context_label = "IMD",
+  map_title =
+    "60-minute Public Transit Accessibility and IMD",
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_60_pt_imd_map <- bilisa_60_pt_imd$map
+
+# plot
+bilisa_60_pt_imd_map
+```
+
+```{r}
+bilisa_15_walk_imd <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_15_walk",
+  context_var = "imd_z",
+  context_label = "IMD",
+  map_title = "15-minute Walking Accessibility and IMD",
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_15_walk_imd_map <- bilisa_15_walk_imd$map
+
+# plot
+bilisa_15_walk_imd_map
+```
+
+```{r}
+bilisa_60_walk_imd <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_60_walk",
+  context_var = "imd_z",
+  context_label = "IMD",
+  map_title =
+    "60-minute Walking Accessibility and IMD",
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_60_walk_imd_map <- bilisa_60_walk_imd$map
+
+# plot
+bilisa_60_walk_imd_map
+```
+
+```{r}
+bilisa_15_cycle_imd <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_15_cycle",
+  context_var = "imd_z",
+  context_label = "IMD",
+  map_title =
+    "15-minute Cycle Accessibility and IMD",
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_15_cycle_imd_map <- bilisa_15_cycle_imd$map
+
+# plot
+bilisa_15_cycle_imd_map
+```
+
+```{r}
+bilisa_60_cycle_imd <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_60_cycle",
+  context_var = "imd_z",
+  context_label = "IMD",
+  map_title =
+    "60-minute Cycle Accessibility and IMD",
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_60_cycle_imd_map <- bilisa_60_cycle_imd$map
+
+# plot
+bilisa_60_cycle_imd_map
+```
+
+**Cowplot Combine Maps**
+
+```{r}
+bilisa_grobs <- list(
+  tmap::tmap_grob(bilisa_15_pt_suhii_map),
+  tmap::tmap_grob(bilisa_15_pt_imd_map),
+
+  tmap::tmap_grob(bilisa_15_walk_suhii_map),
+  tmap::tmap_grob(bilisa_15_walk_imd_map),
+
+  tmap::tmap_grob(bilisa_15_cycle_suhii_map),
+  tmap::tmap_grob(bilisa_15_cycle_imd_map)
+)
+
+bilisa_15_maps_combined <- cowplot::plot_grid(
+  plotlist = bilisa_grobs,
+  ncol = 2,
+  labels = c("a", "b", "c", "d", "e", "f"),
+  label_size = 12,
+  align = "hv"
+)
+
+bilisa_15_maps_combined
+```
+
+```{r}
+# set up a shared legend for plotting purposes
+
+legend_labels <- c(
+  "Low access–High SUHII/IMD",
+  "High access–High SUHII/IMD",
+  "Low access–Low SUHII/IMD",
+  "High access–Low SUHII/IMD"
+)
+
+legend_colours <- c(
+  "Low access–High SUHII/IMD"  = "#D73027",
+  "High access–High SUHII/IMD" = "#F4A582",
+  "Low access–Low SUHII/IMD"   = "#91BFDB",
+  "High access–Low SUHII/IMD"  = "#4575B4"
+)
+
+legend_data <- data.frame(
+  cluster = factor(
+    legend_labels,
+    levels = legend_labels
+  ),
+  x = 1,
+  y = 1:4
+)
+
+legend_plot <- ggplot(
+  legend_data,
+  aes(x = x, y = y, fill = cluster)
+) +
+  geom_point(
+    shape = 22,
+    size = 8,
+    colour = NA
+  ) +
+  scale_fill_manual(
+    values = legend_colours,
+    breaks = legend_labels,
+    drop = FALSE,
+    name = "BiLISA cluster"
+  ) +
+  guides(
+    fill = guide_legend(
+      override.aes = list(
+        shape = 22,
+        size = 8,
+        colour = NA
+      )
+    )
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.key.height = grid::unit(0.65, "cm"),
+    legend.key.width = grid::unit(0.65, "cm"),
+    legend.background = element_blank()
+  )
+
+shared_legend <- cowplot::get_legend(
+  legend_plot,
+  legend = "right"
+)
+```
+
+```{r}
+# 15 min BiLISA maps
+bilisa_15_final <- cowplot::plot_grid(
+  bilisa_15_maps_combined,
+  shared_legend,
+  ncol = 2,
+  rel_widths = c(0.78, 0.22)
+)
+
+bilisa_15_final
+```
+
+```{r}
+# save as png
+ggsave(
+  filename = "figures/bilisa_15_maps_combined.png",
+  plot = bilisa_15_final,
+  width = 12.2,
+  height = 8.27,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
+```
+
+```{r}
+# 60 min BiLISA maps
+bilisa_grobs2 <- list(
+  tmap::tmap_grob(bilisa_60_pt_suhii_map),
+  tmap::tmap_grob(bilisa_60_pt_imd_map),
+
+  tmap::tmap_grob(bilisa_60_walk_suhii_map),
+  tmap::tmap_grob(bilisa_60_walk_imd_map),
+
+  tmap::tmap_grob(bilisa_60_cycle_suhii_map),
+  tmap::tmap_grob(bilisa_60_cycle_imd_map)
+)
+
+bilisa_60_maps_combined <- cowplot::plot_grid(
+  plotlist = bilisa_grobs2,
+  ncol = 2,
+  labels = c("a", "b", "c", "d", "e", "f"),
+  label_size = 12,
+  align = "hv"
+)
+
+bilisa_60_maps_combined
+```
+
+```{r}
+bilisa_60_final <- cowplot::plot_grid(
+  bilisa_60_maps_combined,
+  shared_legend,
+  ncol = 2,
+  rel_widths = c(0.78, 0.22)
+)
+
+bilisa_60_final
+```
+
+```{r}
+ggsave(
+  filename = "figures/bilisa_60_maps_combined.png",
+  plot = bilisa_60_final,
+  width = 12.2,
+  height = 8.27,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
 ```
