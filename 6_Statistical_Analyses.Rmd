@@ -1417,6 +1417,10 @@ model_60_walk_bym2 <- INLA::inla(
 **15 cycle**
 
 ```{r}
+install.packages("INLA", repos = c(getOption("repos"), INLA = "https://inla.r-inla-download.org/R/testing"), dependencies = TRUE)
+```
+
+```{r}
 # run model
 model_15_cycle_bym2 <- INLA::inla(
   formula = formula_15_cycle,
@@ -1536,7 +1540,7 @@ cpo_pit_summary
 par(mfrow = c(2, 3), mar = c(3, 3, 2, 1))
 for (nm in names(six_models)) {
   hist(six_models[[nm]]$cpo$pit, breaks = 20,
-       main = paste0(nm, " (Poisson)"), xlab = "", ylab = "", col = "steelblue")
+       main = nm, xlab = "", ylab = "", col = "steelblue")
 }
 par(mfrow = c(1, 1))
 ```

@@ -741,6 +741,44 @@ cooling_effective_filtered_out <- cooling_effective %>%
 ```
 
 ```{r}
+# Exact PCI class boundaries
+pci_breaks <- c(0.00, 0.03, 0.06, 0.09, 0.11)
+
+pci_labels <- c(
+  "0.00–0.03",
+  "0.03–0.06",
+  "0.06–0.09",
+  "0.09–0.11"
+)
+
+pci_teals <- c(
+  "0.00–0.03" = "#B8DDDA",
+  "0.03–0.06" = "#72C0BB",
+  "0.06–0.09" = "#2FA5A0",
+  "0.09–0.11" = "#008F8C"
+)
+
+# Create plotting variable and PCI classes
+cooling_effective_UGS_clean <- cooling_effective_UGS_clean %>%
+  mutate(
+    # Keeps any very small values at 0 and values above 0.11
+    # inside the displayed range, matching oob = squish
+    PCI_plot = scales::squish(
+      PCI,
+      range = range(pci_breaks)
+    ),
+
+    PCI_bin = cut(
+      PCI_plot,
+      breaks = pci_breaks,
+      labels = pci_labels,
+      include.lowest = TRUE,
+      right = TRUE
+    )
+  )
+```
+
+```{r}
 pci_map_gg_clean <- ggplot() +
   geom_sf(
     data = london_boundary,
@@ -749,17 +787,20 @@ pci_map_gg_clean <- ggplot() +
     linewidth = 0.4
   ) +
   geom_sf(
-    data = greenspace_pci,          # not cooling-effective -> light grey
+    # not cooling effective as grey first
+    data = greenspace_pci,
     fill = "#E3E3E3",
     color = NA
   ) +
   geom_sf(
-    data = cooling_effective_filtered_out,   # <- NEW: cooling-effective but wrong function
-    fill = "#9E9E9E",                        # darker grey
+    # cooling effective but removed for functional purposes in darker grey
+    data = cooling_effective_filtered_out, 
+    fill = "#9E9E9E", 
     color = NA
   ) +
   geom_sf(
-    data = cooling_effective_clean_map,      # kept parks -> teal (on top)
+    # the cooling effective ones 
+    data = cooling_effective_UGS_clean,
     aes(fill = PCI_bin),
     color = NA
   ) +
@@ -776,14 +817,19 @@ pci_map_gg_clean <- ggplot() +
 
 # Histogram legend — filtered data
 hist_legend_pci_clean <- ggplot(
-  st_drop_geometry(cooling_effective_UGS_clean),   # <- filtered data
+  st_drop_geometry(cooling_effective_UGS_clean), 
   aes(x = PCI)
 ) +
+  #geom_histogram(
+    #aes(fill = after_stat(x)),
+    #bins = 40,
+    #color = NA
   geom_histogram(
     aes(fill = after_stat(x)),
-    bins = 40,
+    binwidth = 0.003,
+    boundary = 0,
     color = NA
-  ) +
+) +
   geom_vline(
     xintercept = pci_breaks,
     linetype = "dashed",
@@ -845,7 +891,7 @@ combined_pci_maps <- plot_grid(
   pci2_map,
   labels     = c("a", "b"),
   label_size = 14,
-  ncol       = 2
+  ncol       = 1
 )
 
 combined_pci_maps
@@ -854,10 +900,10 @@ combined_pci_maps
 ```{r}
 # save as PNG
 ggsave(
-  filename = "figures/Fig5_Cooling_Effective_UGS_PCI_map.png",
+  filename = "figures/Fig8_Cooling_Effective_UGS_PCI_map.png",
   plot = combined_pci_maps,
-  width = 18,
-  height = 8.27,
+  width = 7.5,
+  height = 10,
   units = "in",
   dpi = 300,
   bg = "white"
