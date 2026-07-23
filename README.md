@@ -23,19 +23,28 @@
 ## Repository Structure
 ```
 london-cooling-access-equity/
-├── 1_Data_Filter_London.Rmd                      # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
-├── 2_GoogleEarthEngine_LST_UHI                   # Google Earth Engine code script for London LST; London LSOAs LST; SUHII
-├── 3_GoogleEarthEngine_greenspace_buffer_LST     # Google Earth Engine code script for LST of greenspaces > 2ha and its corresponding buffer rings (30m, 0-900m) 
-├── 4_Quantify_Urban_Heat_Park_Cooling.Rmd        # Urban Heat and Park Cooling Metrics; Identify Cooling Effective UGS
-├── 5_Multimodal_Travel_Time_r5r.Rmd              # 
-├── 6_
-├── data/                                         # Folder containing all data files used for this study, available to download below under Data Availability
-├── figures/                                      # Figures presented in the dissertation document
-|   ├── Fig1_Mean_LST_Greenspace_2ha_map.png
-|   ├── Fig2_LSOA_SUHII.png
-|   ├── Fig3_Cooling_Effective_UGS_PCI_map.png
-|   ├── Fig4_Origin_Destinations.png
-|   └── 
+├── 1_Data_Filter_London.Rmd                           # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
+├── 1a_Map_Study_Area.Rmd                              # Mapping Study Area
+├── 2_GoogleEarthEngine_LST_UHI                        # Google Earth Engine code script for London LST; London LSOAs LST; SUHII
+├── 3_GoogleEarthEngine_greenspace_buffer_LST          # Google Earth Engine code script for LST of greenspaces > 2ha and its corresponding buffer rings (30m, 0-900m) 
+├── 4_Quantify_Urban_Heat_Park_Cooling.Rmd             # Urban Heat and Park Cooling Metrics; Identify Cooling Effective UGS
+├── 5_Multimodal_Travel_Time_r5r.Rmd                   # r5r Travel Time Matrices
+├── 5a_Map_Travel_Time_Cummulative_Accessibility.Rmd   # Mapping Travel Time derived from the above Rmd
+├── 6_Statistical_Analyses.Rmd                         # Statistical Analyses Performing Regression Modelling and Spatial Clustering Analysis
+├── data/                                              # Folder containing all data files used for this study, available to download below under Data Availability
+├── figures/                                           # Figures presented in the dissertation document
+|   ├── Fig1_Study_Area.png
+|   ├── Fig2_Mean_LST_Greenspace_2ha_map.png
+|   ├── Fig3_Buffer_Schematic_Diagram.png
+|   ├── Fig4_Illustration_of_LST_change_curve_of_park_cooling_process_Peng_et_al_2021.jpg
+|   ├── Fig5_Origin_Destinations.png
+|   ├── Fig6_Spearman_Heatmap.png
+|   ├── Fig7_LSOA_SUHII.png
+|   ├── Fig8_Cooling_Effective_UGS_PCI_map.png
+|   ├── Fig9_Minimum_Travel_Time_by_Mode.png
+|   ├── Fig10_Cummulative_Opportunity_Map.png
+|   ├── Fig11_BiLISA_15_Accessibility_SUHII_IMD.png
+|   └── Fig12_BiLISA_60_Accessibility_SUHII_IMD.png
 ```
 
 ## Data Availability
@@ -46,14 +55,14 @@ The required full project data can be downloaded here: [Download Project Data](h
 After downloading, place it in the project directory using the following structure:
 ```
 data/
-├── raw_data/                                     # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 
+├── raw_data/                                          # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 
 ├── gla/
-├── lsoa_london/                                  # LSOA boundary shapefile filtered to London only (large file - gitignored)
-├── London_LSOA_LST_SUHI/                          # LST and SUHII data retreived from Google Earth Engine (large file - gitignored)
-├── London_LST_median.tif                         # Median LST raster data for Greater London retreived from Google Earth Engine
-├── greenspace_london/                            # Greenspace polygons shapefile filtered to London only (large file - gitignored)
-├── greenspace_london_2ha/                        # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
-├── greenspace_buffer_LST/                        # Green space LST and Green space Buffer LST (30m, 0-900m) retreived from Google Earth Engine (large file - gitignored)
+├── lsoa_london/                                       # LSOA boundary shapefile filtered to London only (large file - gitignored)
+├── London_LSOA_LST_SUHI/                              # LST and SUHII data retreived from Google Earth Engine (large file - gitignored)
+├── London_LST_median.tif                              # Median LST raster data for Greater London retreived from Google Earth Engine
+├── greenspace_london/                                 # Greenspace polygons shapefile filtered to London only (large file - gitignored)
+├── greenspace_london_2ha/                             # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
+├── greenspace_buffer_LST/                             # Green space LST and Green space Buffer LST (30m, 0-900m) retreived from Google Earth Engine (large file - gitignored)
 ├── cooling_effective_UGS/
 ├── london_lsoa_pop_weighted_centroids/
 ├── origins_destinations/

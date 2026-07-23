@@ -724,6 +724,7 @@ Cycling = 8288685
 **Load the TTM objects**
 
 ```{r}
+# read in the TTM produced by r5r above
 TTM_PT <- readRDS("data/r5r_TTM/r5r_TTM_PT_raw.rds")
 TTM_walk <- readRDS("data/r5r_TTM/r5r_TTM_walk_raw.rds")
 TTM_cycle <- readRDS("data/r5r_TTM/r5r_TTM_cycle_raw.rds")
@@ -746,7 +747,7 @@ names(cooling_effective_access_points)
 ```
 
 ```{r}
-# join: access point id to find parent greenspace site
+# join access point id to find the parent greenspace site
 access_point_find <- cooling_effective_access_points %>% 
   st_drop_geometry() %>%
   transmute(
