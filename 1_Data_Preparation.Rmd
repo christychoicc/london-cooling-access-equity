@@ -2,13 +2,12 @@
 title: "1_Data_Preparation"
 ---
 
-This markdown file contans the code for filtering the downloaded raw data sets to the Greater London study area. These are pre-filtered for further data preprocessing in Google Earth Engine. The filtered data sets are saved as follows:
+This markdown file contains the code for filtering the downloaded raw data sets to the Greater London study area. These are pre-filtered for further data pre-processing in Google Earth Engine. The filtered data sets are saved as follows:
 
 1.  `lsoa_london` : LSOA boundaries filtered for London only
-2.  `greenspace_london` : green space polygons filtered for any intersecting the Greater London boundary
-3.  `greenspace_london_2ha` : green space polygons filtered for any intersecting the Greater London boundary, and sizes bigger than 2ha only (as informed by literature)
-4.  `london_lsoa_pop_weighted_centroids.shp` : LSOA population weighted centroids filtered for Greater London only
-5.  `gtfs_rail.zip` : converted rail timetable data into GTFS format.
+2.  `greenspace_london_2ha` : green space polygons filtered for any intersecting the Greater London boundary, further filtered for sizes bigger than 2ha only (as informed by literature)
+3.  `london_lsoa_pop_weighted_centroids.shp` : LSOA population weighted centroids filtered for Greater London only
+4.  `gtfs_rail.zip` : converted rail timetable data into GTFS format.
 
 ## Load Packages
 
@@ -51,17 +50,14 @@ table(st_geometry_type(lsoa_london))
 ```
 
 ```{r}
-qtm(lsoa_london)
-```
-
-```{r, eval=FALSE}
 # Save as shapefile
 st_write(lsoa_london, "data/lsoa_london/lsoa_london.shp")
 ```
 
-## 2. London Green Space Polygons
+## 2. London Green Space Polygons \> 2ha
 
 ```{r}
+# Greenspace polygons
 greenspace_gb <- st_read("data/raw_data/OS-Open-Greenspace-GB/GB_GreenspaceSite/GB_GreenspaceSite.shp") %>%
   st_transform(st_crs(london_boundary))
 ```
@@ -71,17 +67,6 @@ greenspace_gb <- st_read("data/raw_data/OS-Open-Greenspace-GB/GB_GreenspaceSite/
 greenspace_london <- greenspace_gb %>% 
     st_filter(london_boundary, .predicate = st_intersects)
 ```
-
-```{r}
-qtm(greenspace_london)
-```
-
-```{r, eval=FALSE}
-# Save as shapefile
-st_write(greenspace_london, "data/greenspace_london/greenspace_london.shp")
-```
-
-## 3. London Green Space Polygons \> 2ha
 
 ```{r}
 # Removed polygon sizes smaller than 2ha
@@ -94,16 +79,14 @@ greenspace_london_2ha <- greenspace_london %>%
 ```
 
 ```{r}
-qtm(greenspace_london_2ha)
-```
-
-```{r, eval=FALSE}
+# save as shp
 st_write(greenspace_london_2ha, "data/greenspace_london_2ha/greenspace_london_2ha.shp")
 ```
 
-## 4. London LSOA Population Weighted Centroids
+## 3. London LSOA Population Weighted Centroids
 
 ```{r}
+# population weighted centroids
 pop_weighted_centroids <- st_read("data/raw_data/LSOA_PopCentroids_EW_2021_V4_-7256415914866551835")
 ```
 
@@ -118,21 +101,16 @@ london_pop_weighted_centroids <- pop_weighted_centroids %>%
 ```
 
 ```{r}
-# Check 
-nrow(london_pop_weighted_centroids)
-```
-
-```{r}
 st_write(london_pop_weighted_centroids, "data/london_lsoa_pop_weighted_centroids/london_lsoa_pop_weighted_centroids.shp")
 ```
 
-## 5. Rail GTFS
+## 4. Rail GTFS
 
-```{r, eval=FALSE}
+```{r}
 remotes::install_github("ITSleeds/UK2GTFS")
 ```
 
-```{r, eval=FALSE}
+```{r}
 # Data taken from National Rail Portal
 # Save username and password
 install.packages("usethis")
@@ -141,7 +119,7 @@ library(usethis)
 usethis::edit_r_environ()
 ```
 
-```{r, eval=FALSE}
+```{r}
 # Load the specific package for converting to GTFS
 library(UK2GTFS)
 
