@@ -18,6 +18,8 @@ library(sp)
 library(readr)
 library(dplyr)
 library(knitr)
+library(tidyr)
+library(tibble)
 library(tidyverse)
 library(tmap)
 library(cowplot)
@@ -264,22 +266,27 @@ names(census_ethnicity)
 ### Wrangle data variables for regression modelling
 
 ```{r}
-# filter london lsoas only
+# filter for london lsoas only
 london_lsoa_codes <- london_lsoa %>%
   clean_names() %>%
   pull(lsoa21cd)
 ```
 
 ```{r}
+# create percentage variables for age 4 and under and age 65 and over
 census_age_cleaned <- census_age_5year_band %>%
   mutate(
+    # create % of age 4 and under
+    # calculate percentage
     age_4_and_under_pct = ifelse(
       age_total > 0,
       (age_4_and_under / age_total) * 100,
       NA
     ),
+    # create % of age 65 and over
     age_65_and_over = rowSums(
       across(
+        # sum up 65 to 85 and over
         c(
           age_65_to_69,
           age_70_to_74,
@@ -290,12 +297,14 @@ census_age_cleaned <- census_age_5year_band %>%
       ),
       na.rm = TRUE
     ),
+    # calculate percentage
     age_65_and_over_pct = ifelse(
       age_total > 0,
       (age_65_and_over / age_total)* 100,
       NA
     )
   )%>% 
+  # keep the ones that are within london lsoas only
   filter(lsoa21cd %in% london_lsoa_codes)
 ```
 
@@ -333,27 +342,34 @@ census_health_cleaned <- census_health %>%
 ```
 
 ```{r}
+# create ethnic minority group variable
 census_ethnicity_cleaned <- census_ethnicity %>%
    mutate(
+     # everything else but white british group - defined by ONS
     ethnic_minority =
       ethnic_group_total_residents - white_british_group,
-    
+    # calculate percentage
     ethnic_minority_pct = ifelse(
       ethnic_group_total_residents > 0,
       (ethnic_minority / ethnic_group_total_residents) * 100,
       NA
     )
   )%>% 
+  # keep the ones that are within london lsoas only
   filter(lsoa21cd %in% london_lsoa_codes)
 ```
 
 ```{r}
-imd_score_cleaned <- imd_score %>% filter(lsoa21cd %in% london_lsoa_codes)
+# imd score variable 
+# filter for london lsoas only
+imd_score_cleaned <- imd_score %>% 
+  filter(lsoa21cd %in% london_lsoa_codes)
 ```
 
 ### Join Data
 
 ```{r}
+# join data
 london_join <- multimodal_accessibility_lsoa %>%
   # SUHII 
   left_join(
@@ -409,16 +425,7 @@ london_join <- multimodal_accessibility_lsoa %>%
   )
 ```
 
-```{r, eval=FALSE}
-# check joined table
-london_join %>% 
-  st_drop_geometry() %>% 
-  View()
-```
-
-```{r}
-names(london_join)
-```
+**Add an additional Inner and Outer London control + join to data**
 
 ```{r}
 # create inner london control variable
@@ -441,11 +448,11 @@ london_join <- london_join %>%
 ```
 
 ```{r}
-#check
+#check fully joined data
 names(london_join)
 ```
 
-## 2. Regression Data Preparation
+## 2. Check Data for Regression
 
 ```{r}
 # check data types
@@ -554,7 +561,7 @@ heatmap <- corrplot(
 dir.create("figures", showWarnings = FALSE)
 
 png(
-  filename = "figures/Fig_Appendix_Spearman_Heatmap.png",
+  filename = "figures/Fig6_Spearman_Heatmap.png",
   width = 8.5,
   height = 5.5,
   units = "in",
@@ -577,7 +584,7 @@ dev.off()
 ```
 
 ```{r}
-outcomes <- c(
+dependents <- c(
   "access_score_15_pt",
   "access_score_60_pt",
   "access_score_15_walk",
@@ -588,12 +595,12 @@ outcomes <- c(
 
 distribution_check <- do.call(
   rbind,
-  lapply(outcomes, function(v) {
+  lapply(dependents, function(v) {
 
     y <- london_join[[v]]
 
     data.frame(
-      outcome = v,
+      dependents = v,
       n = sum(!is.na(y)),
       mean = mean(y, na.rm = TRUE),
       variance = var(y, na.rm = TRUE),
@@ -609,7 +616,7 @@ distribution_check <- do.call(
 distribution_check
 ```
 
-### Transform Variables
+### 3.1. Transform Variables
 
 **Log transform population density and standardise other variables for clean interpretation**
 
@@ -631,10 +638,6 @@ model_variables <- london_join %>%
   )
 ```
 
-```{r}
-names(model_variables)
-```
-
 ## 4. Model Choices
 
 <https://rpubs.com/Geesaale/1263990> –\> count regression: poisson or negative binomial, depending on the nature of spatial dependence of data, spatial error more suitable (spatial error models is suitable when the spatial autocorrelation is due to an underlying spatial process or unmeasured factors).
@@ -644,10 +647,8 @@ names(model_variables)
 Loop all models:
 
 ```{r}
-library(MASS)
-
-# The predictors are the same for every model
-predictors <- c(
+# independent variables to be the same for every model
+independents <- c(
   "imd_z * suhii_z",
   "log_pop_density_z",
   "age_4_under_z",
@@ -656,8 +657,8 @@ predictors <- c(
   "inner_outer_london"
 )
 
-# The six outcomes to loop over
-outcomes <- c(
+# six dependent variables to loop over
+dependents <- c(
   #"access_score_15_pt",
   "access_score_60_pt",
   #"access_score_15_walk",
@@ -666,15 +667,15 @@ outcomes <- c(
   "access_score_60_cycle"
 )
 
-# Function to fit one negative binomial GLM given an outcome name
-fit_nb <- function(outcome, data, predictors) {
-  f <- reformulate(predictors, response = outcome)
+# Function to fit one negative binomial GLM given an dependents name
+fit_nb <- function(dependents, data, independents) {
+  f <- reformulate(independents, response = dependents)
   glm.nb(f, data = data)
 }
 
-# Loop over all outcomes, returning a named list of fitted models
-models_nb <- lapply(outcomes, fit_nb, data = model_variables, predictors = predictors)
-names(models_nb) <- outcomes
+# Loop over all dependents, returning a named list of fitted models
+models_nb <- lapply(dependents, fit_nb, data = model_variables, independents = independents)
+names(models_nb) <- dependents
 ```
 
 ```{r}
@@ -690,8 +691,8 @@ for (nm in names(models_nb)) {
 ## 6. Poisson Regression
 
 ```{r}
-# The predictors are the same for every model
-predictors <- c(
+# The independents are the same for every model
+independents <- c(
   "imd_z * suhii_z",
   "log_pop_density_z",
   "age_4_under_z",
@@ -700,8 +701,8 @@ predictors <- c(
   "inner_outer_london"
 )
 
-# The six outcomes to loop over
-outcomes <- c(
+# The six dependents to loop over
+dependents <- c(
   "access_score_15_pt",
   #"access_score_60_pt",
   "access_score_15_walk"
@@ -710,15 +711,15 @@ outcomes <- c(
   #"access_score_60_cycle"
 )
 
-# Function to fit one Poisson GLM given an outcome name
-fit_poisson <- function(outcome, data, predictors) {
-  f <- reformulate(predictors, response = outcome)
+# Function to fit one Poisson GLM given an dependents name
+fit_poisson <- function(dependents, data, independents) {
+  f <- reformulate(independents, response = dependents)
   glm(f, data = model_variables, family = poisson(link = "log"))
 }
 
-# Loop over all outcomes, returning a named list of fitted models
-models_poisson <- lapply(outcomes, fit_poisson, data = model_variables, predictors = predictors)
-names(models_poisson) <- outcomes
+# Loop over all dependents, returning a named list of fitted models
+models_poisson <- lapply(dependents, fit_poisson, data = model_variables, independents = independents)
+names(models_poisson) <- dependents
 ```
 
 ```{r}
@@ -782,7 +783,7 @@ dispersion_results <- dispersion_results[
 dispersion_results
 ```
 
-Iteration limit for access_score_15_pt and access_score_15_walk, tried on Poisson across all models. Checked AIC values as below table (bold text refers to lower AIC values), their AIC values are also higher in the the negative binomial regression. As well as dispersion checked as above, dispersion values close to 1.
+AIC values as below table (bold text refers to lower AIC values. As well as dispersion checked as above, dispersion values close to 1.
 
 | Dependent variable    | AIC - Negative Binomial | AIC - Poisson |
 |-----------------------|-------------------------|---------------|
@@ -803,7 +804,7 @@ coordsLSOA <- london_lsoa%>%
   st_centroid()%>%
   st_geometry()
 
-plot(coordsLSOA)
+#plot(coordsLSOA)
 ```
 
 ```{r}
@@ -860,8 +861,8 @@ model_profile <- model_variables %>%
   mutate(model_15_pt_resids)
 
 #now plot the residuals
-tmap_mode("view")
-qtm(model_profile, fill = "model_15_pt_resids")
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_15_pt_resids")
 ```
 
 ```{r}
@@ -908,8 +909,8 @@ model_profile <- model_variables %>%
   mutate(model_60_pt_resids)
 
 #now plot the residuals
-tmap_mode("view")
-qtm(model_profile, fill = "model_60_pt_resids")
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_60_pt_resids")
 ```
 
 **Moran's I - Queens Case**
@@ -959,8 +960,8 @@ model_profile <- model_variables %>%
   mutate(model_15_walk_resids)
 
 #now plot the residuals
-tmap_mode("view")
-qtm(model_profile, fill = "model_15_walk_resids")
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_15_walk_resids")
 ```
 
 **Moran's I - Queens Case**
@@ -1010,8 +1011,8 @@ model_profile <- model_variables %>%
   mutate(model_60_walk_resids)  
 
 #now plot the residuals 
-tmap_mode("view") 
-qtm(model_profile, fill = "model_60_walk_resids")
+#tmap_mode("view") 
+#qtm(model_profile, fill = "model_60_walk_resids")
 ```
 
 **Moran's I - Queens Case**
@@ -1061,8 +1062,8 @@ model_profile <- model_variables %>%
   mutate(model_15_cycle_resids)    
 
 #now plot the residuals  
-tmap_mode("view")  
-qtm(model_profile, fill = "model_15_cycle_resids")
+#tmap_mode("view")  
+#qtm(model_profile, fill = "model_15_cycle_resids")
 ```
 
 **Moran's I - Queens Case**
@@ -1112,8 +1113,8 @@ model_profile <- model_variables %>%
   mutate(model_60_cycle_resids)      
 
 #now plot the residuals   
-tmap_mode("view")   
-qtm(model_profile, fill = "model_60_cycle_resids")
+#tmap_mode("view")   
+#qtm(model_profile, fill = "model_60_cycle_resids")
 ```
 
 **Moran's I - Queens Case**
@@ -1220,7 +1221,7 @@ class(spatial_model_variables)
 # and also looked at 
 # https://www.sciencedirect.com/science/article/pii/S1353829225001765?via%3Dihub#sec2 --> https://github.com/mbcalles/Area-Level-Deprivation-Traffic-Injury
 
-# library(INLA)
+library(INLA)
 
 # 1. Create a neighborhood list based on polygon contiguity - queens
 nb <- spdep::poly2nb(
@@ -1441,6 +1442,8 @@ summary(model_15_cycle_bym2)
 **60 cycle**
 
 ```{r}
+library(INLA)
+
 # run model
 model_60_cycle_bym2 <- INLA::inla(
   formula = formula_60_cycle,
@@ -1457,7 +1460,7 @@ model_60_cycle_bym2 <- INLA::inla(
 ```
 
 ```{r}
-# 1. Named list with self-explanatory labels
+# name models for clean interpretation
 bym2_models <- list(
   "Model 1" = model_15_pt_bym2,
   "Model 2" = model_60_pt_bym2,
@@ -1467,7 +1470,7 @@ bym2_models <- list(
   "Model 6" = model_60_cycle_bym2
 )
 
-# 2. Readable variable names (order here = row order in the table)
+# name variables 
 variable_labels <- c(
   "(Intercept)" = "Intercept",
   "imd_z" = "IMD (z)",
@@ -1480,8 +1483,8 @@ variable_labels <- c(
   "factor(inner_outer_london)Inner" = "Inner, Outer London"
 )
 
-# 3. Extract fixed effects, exponentiate to rate ratios, format as one cell
-# just like this: https://www.sciencedirect.com/science/article/pii/S2405673123000144?utm_source=chatgpt.com
+# Extract fixed effects, exponentiate to rate ratios, format as one cell
+# just like this: https://www.sciencedirect.com/science/article/pii/S2405673123000144
 fixed_effects_long <- lapply(names(bym2_models), function(model_name) {
   bym2_models[[model_name]]$summary.fixed %>%
     as.data.frame() %>%
@@ -1491,19 +1494,20 @@ fixed_effects_long <- lapply(names(bym2_models), function(model_name) {
       variable = variable_labels[term],
       cell = sprintf(
         "%.3f (%.3f, %.3f)",
-        exp(`0.5quant`), exp(`0.025quant`), exp(`0.975quant`)
+        # mean RR and the 95% CI
+        exp(mean), exp(`0.025quant`), exp(`0.975quant`)
       )
     )
 }) %>% bind_rows()
 
-# 4. One column per model, one row per variable
+# One column per model, one row per variable
 fixed_effects_table <- fixed_effects_long %>%
   pivot_wider(names_from = model, values_from = cell) %>%
   arrange(match(variable, variable_labels))
 
 knitr::kable(
   fixed_effects_table,
-  caption = "BYM2 fixed effects: Rate Ratios and 95% Credible Intervals (CI)"
+  caption = "BYM2 Fixed Effects Posterior: Mean Rate Ratios and 95% Credible Intervals (CI)"
 )
 ```
 
@@ -1578,7 +1582,7 @@ cat(
 
 #### 8.3.2. CPO failures
 
-```{r}
+```{r, eval=FALSE}
 bym2_models <- list(
   "15-minute Public Transit" = model_15_pt_bym2,
   "60-minute Public Transit" = model_60_pt_bym2,
@@ -1615,6 +1619,8 @@ sum(log(model_15_walk_bym2_cpo$cpo$cpo), na.rm = TRUE)
 sum(log(model_15_cycle_bym2_cpo$cpo$cpo), na.rm = TRUE)
 ```
 
+Barely any changes after recompute, move on...
+
 #### 8.3.3. Residuals
 
 Rebuild the centroids, queens, knn first
@@ -1641,12 +1647,12 @@ LLSOA_knn2 <- knn_LSOA2 %>%
   knn2nb()
 ```
 
-```{r}
+```{r, eval=FALSE}
 #plot them
 plot(LLSOA_nb2, st_geometry(coordsLSOA2), col="red")
 ```
 
-```{r}
+```{r, eval=FALSE}
 plot(LLSOA_knn, st_geometry(coordsLSOA2), col="blue")
 ```
 
@@ -1677,8 +1683,8 @@ model_profile <- spatial_model_variables %>%
   mutate(model_15_pt_bym2_resids)
 
 #now plot the residuals
-tmap_mode("view")
-qtm(model_profile, fill = "model_15_pt_bym2_resids")
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_15_pt_bym2_resids")
 ```
 
 ```{r}
@@ -1717,8 +1723,8 @@ model_profile <- spatial_model_variables %>%
   mutate(model_60_pt_bym2_resids)
 
 #now plot the residuals
-tmap_mode("view")
-qtm(model_profile, fill = "model_60_pt_bym2_resids")
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_60_pt_bym2_resids")
 ```
 
 ```{r}
@@ -1757,8 +1763,8 @@ model_profile <- spatial_model_variables %>%
   mutate(model_15_walk_bym2_resids)
 
 #now plot the residuals
-tmap_mode("view")
-qtm(model_profile, fill = "model_15_walk_bym2_resids")
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_15_walk_bym2_resids")
 ```
 
 ```{r}
@@ -1797,8 +1803,8 @@ model_profile <- spatial_model_variables %>%
   mutate(model_60_walk_bym2_resids)
 
 #now plot the residuals
-tmap_mode("view")
-qtm(model_profile, fill = "model_60_walk_bym2_resids")
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_60_walk_bym2_resids")
 ```
 
 ```{r}
@@ -1837,8 +1843,8 @@ model_profile <- spatial_model_variables %>%
   mutate(model_15_cycle_bym2_resids)
 
 #now plot the residuals
-tmap_mode("view")
-qtm(model_profile, fill = "model_15_cycle_bym2_resids")
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_15_cycle_bym2_resids")
 ```
 
 ```{r}
@@ -1877,8 +1883,8 @@ model_profile <- spatial_model_variables %>%
   mutate(model_60_cycle_bym2_resids)
 
 #now plot the residuals
-tmap_mode("view")
-qtm(model_profile, fill = "model_60_cycle_bym2_resids")
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_60_cycle_bym2_resids")
 ```
 
 ```{r}
@@ -1904,6 +1910,8 @@ model_60_cycle_bym2_resids_nearest_neighbour <- model_profile %>%
 
 model_60_cycle_bym2_resids_nearest_neighbour
 ```
+
+significantly reduced compared to the GLM models, but still some spatial autocorrelation remains –\> write in discussion
 
 ## 9. BiLISA - Bivariate LISA mapping
 
@@ -2243,8 +2251,7 @@ bilisa_15_pt_suhii <- run_bilisa_map(
   access_var = "access_score_15_pt",
   context_var = "suhii_z",
   context_label = "SUHII",
-  map_title =
-    "15-minute Public Transit Accessibility and SUHII",
+  map_title = NULL,
   show_legend = FALSE
 )
 
@@ -2261,8 +2268,7 @@ bilisa_60_pt_suhii <- run_bilisa_map(
   access_var = "access_score_60_pt",
   context_var = "suhii_z",
   context_label = "SUHII",
-  map_title =
-    "60-minute Public Transit Accessibility and SUHII",
+  map_title = NULL,
   show_legend = FALSE
 )
 
@@ -2279,8 +2285,7 @@ bilisa_15_walk_suhii <- run_bilisa_map(
   access_var = "access_score_15_walk",
   context_var = "suhii_z",
   context_label = "SUHII",
-  map_title =
-    "15-minute Walking Accessibility and SUHII",
+  map_title = NULL,
   show_legend = FALSE
 )
 
@@ -2297,8 +2302,7 @@ bilisa_60_walk_suhii <- run_bilisa_map(
   access_var = "access_score_60_walk",
   context_var = "suhii_z",
   context_label = "SUHII",
-  map_title =
-    "60-minute Walking Accessibility and SUHII",
+  map_title = NULL,
   show_legend = FALSE
 )
 
@@ -2315,8 +2319,7 @@ bilisa_15_cycle_suhii <- run_bilisa_map(
   access_var = "access_score_15_cycle",
   context_var = "suhii_z",
   context_label = "SUHII",
-  map_title =
-    "15-minute Cycling Accessibility and SUHII",
+  map_title = NULL,
   show_legend = FALSE
 )
 
@@ -2333,8 +2336,7 @@ bilisa_60_cycle_suhii <- run_bilisa_map(
   access_var = "access_score_60_cycle",
   context_var = "suhii_z",
   context_label = "SUHII",
-  map_title =
-    "60-minute Cycling Accessibility and SUHII",
+  map_title = NULL,
   show_legend = FALSE
 )
 
@@ -2351,8 +2353,7 @@ bilisa_15_pt_imd <- run_bilisa_map(
   access_var = "access_score_15_pt",
   context_var = "imd_z",
   context_label = "IMD",
-  map_title =
-    "15-minute Public Transit Accessibility and IMD",
+  map_title = NULL,
   show_legend = FALSE
 )
 
@@ -2369,8 +2370,7 @@ bilisa_60_pt_imd <- run_bilisa_map(
   access_var = "access_score_60_pt",
   context_var = "imd_z",
   context_label = "IMD",
-  map_title =
-    "60-minute Public Transit Accessibility and IMD",
+  map_title = NULL,
   show_legend = FALSE
 )
 
@@ -2387,7 +2387,7 @@ bilisa_15_walk_imd <- run_bilisa_map(
   access_var = "access_score_15_walk",
   context_var = "imd_z",
   context_label = "IMD",
-  map_title = "15-minute Walking Accessibility and IMD",
+  map_title = NULL,
   show_legend = FALSE
 )
 
@@ -2404,8 +2404,7 @@ bilisa_60_walk_imd <- run_bilisa_map(
   access_var = "access_score_60_walk",
   context_var = "imd_z",
   context_label = "IMD",
-  map_title =
-    "60-minute Walking Accessibility and IMD",
+  map_title = NULL,
   show_legend = FALSE
 )
 
@@ -2422,8 +2421,7 @@ bilisa_15_cycle_imd <- run_bilisa_map(
   access_var = "access_score_15_cycle",
   context_var = "imd_z",
   context_label = "IMD",
-  map_title =
-    "15-minute Cycle Accessibility and IMD",
+  map_title = NULL,
   show_legend = FALSE
 )
 
@@ -2440,8 +2438,7 @@ bilisa_60_cycle_imd <- run_bilisa_map(
   access_var = "access_score_60_cycle",
   context_var = "imd_z",
   context_label = "IMD",
-  map_title =
-    "60-minute Cycle Accessibility and IMD",
+  map_title = NULL,
   show_legend = FALSE
 )
 
@@ -2516,7 +2513,7 @@ legend_plot <- ggplot(
     values = legend_colours,
     breaks = legend_labels,
     drop = FALSE,
-    name = "BiLISA cluster"
+    name = "BiLISA clusters"
   ) +
   guides(
     fill = guide_legend(
@@ -2545,11 +2542,39 @@ shared_legend <- cowplot::get_legend(
 
 ```{r}
 # 15 min BiLISA maps
-bilisa_15_final <- cowplot::plot_grid(
+#bilisa_15_final <- cowplot::plot_grid(
+#  bilisa_15_maps_combined,
+#  shared_legend,
+#  ncol = 2,
+#  rel_widths = c(0.78, 0.22)
+#)
+
+#bilisa_15_final
+
+# Combine the six maps with the shared legend
+bilisa_15_body <- cowplot::plot_grid(
   bilisa_15_maps_combined,
   shared_legend,
   ncol = 2,
-  rel_widths = c(0.78, 0.22)
+  rel_widths = c(0.82, 0.18)
+)
+
+# Create centred overall title
+bilisa_15_title <- cowplot::ggdraw() +
+  cowplot::draw_label(
+    "15-minute Accessibility with SUHII and IMD",
+    fontface = "bold",
+    size = 14,
+    hjust = 0.5,
+    x = 0.5
+  )
+
+# Place the title above the maps
+bilisa_15_final <- cowplot::plot_grid(
+  bilisa_15_title,
+  bilisa_15_body,
+  ncol = 1,
+  rel_heights = c(0.06, 0.94)
 )
 
 bilisa_15_final
@@ -2558,10 +2583,10 @@ bilisa_15_final
 ```{r}
 # save as png
 ggsave(
-  filename = "figures/bilisa_15_maps_combined.png",
+  filename = "figures/Fig_Appendix_BiLISA_15_min_Combined.png",
   plot = bilisa_15_final,
   width = 12.2,
-  height = 8.27,
+  height = 9.5,
   units = "in",
   dpi = 300,
   bg = "white"
@@ -2593,11 +2618,40 @@ bilisa_60_maps_combined
 ```
 
 ```{r}
-bilisa_60_final <- cowplot::plot_grid(
+#bilisa_60_final <- cowplot::plot_grid(
+#  bilisa_60_maps_combined,
+#  shared_legend,
+#  ncol = 2,
+#  rel_widths = c(0.78, 0.22)
+#)
+
+#bilisa_60_final
+
+
+# Combine the six maps with the shared legend
+bilisa_60_body <- cowplot::plot_grid(
   bilisa_60_maps_combined,
   shared_legend,
   ncol = 2,
-  rel_widths = c(0.78, 0.22)
+  rel_widths = c(0.82, 0.18)
+)
+
+# Create centred overall title
+bilisa_60_title <- cowplot::ggdraw() +
+  cowplot::draw_label(
+    "60-minute Accessibility with SUHII and IMD",
+    fontface = "bold",
+    size = 14,
+    hjust = 0.5,
+    x = 0.5
+  )
+
+# Place the title above the maps
+bilisa_60_final <- cowplot::plot_grid(
+  bilisa_60_title,
+  bilisa_60_body,
+  ncol = 1,
+  rel_heights = c(0.06, 0.94)
 )
 
 bilisa_60_final
@@ -2605,10 +2659,484 @@ bilisa_60_final
 
 ```{r}
 ggsave(
-  filename = "figures/bilisa_60_maps_combined.png",
+  filename = "figures/Fig_Appendix_BiLISA_60_min_Combined.png",
   plot = bilisa_60_final,
   width = 12.2,
-  height = 8.27,
+  height = 9.5,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
+```
+
+### 9.2. Distribution of BiLISA Cluster
+
+```{r}
+# Put the 12 existing BiLISA objects into a named list
+bilisa_results <- list(
+  "15-minute Public Transit and SUHII" = bilisa_15_pt_suhii,
+  "15-minute Public Transit and IMD"   = bilisa_15_pt_imd,
+
+  "15-minute Walking and SUHII" = bilisa_15_walk_suhii,
+  "15-minute Walking and IMD"   = bilisa_15_walk_imd,
+
+  "15-minute Cycling and SUHII" = bilisa_15_cycle_suhii,
+  "15-minute Cycling and IMD"   = bilisa_15_cycle_imd,
+
+  "60-minute Public Transit and SUHII" = bilisa_60_pt_suhii,
+  "60-minute Public Transit and IMD"   = bilisa_60_pt_imd,
+
+  "60-minute Walking and SUHII" = bilisa_60_walk_suhii,
+  "60-minute Walking and IMD"   = bilisa_60_walk_imd,
+
+  "60-minute Cycling and SUHII" = bilisa_60_cycle_suhii,
+  "60-minute Cycling and IMD"   = bilisa_60_cycle_imd
+)
+
+
+# Extract cluster classifications from each result
+bilisa_long <- bind_rows(
+  lapply(
+    names(bilisa_results),
+    function(analysis_name) {
+
+      cluster_values <- as.character(
+        bilisa_results[[analysis_name]]$clusters
+      )
+
+      # hotspot() stores non-significant LSOAs as NA
+      cluster_values[is.na(cluster_values)] <- "Not significant"
+
+      tibble(
+        Analysis = analysis_name,
+        Cluster = cluster_values
+      )
+    }
+  )
+)
+```
+
+```{r}
+analysis_order <- names(bilisa_results)
+
+cluster_order <- c(
+  "High-High",
+  "High-Low",
+  "Low-High",
+  "Low-Low",
+  "Not significant"
+)
+
+# Count LSOAs in each classification
+bilisa_counts <- bilisa_long %>%
+  dplyr::count(
+    Analysis,
+    Cluster,
+    name = "n"
+  ) %>%
+  tidyr::complete(
+    Analysis = analysis_order,
+    Cluster = cluster_order,
+    fill = list(n = 0)
+  ) %>%
+  dplyr::group_by(Analysis) %>%
+  dplyr::mutate(
+    total_lsoas = sum(n),
+    percentage = (n / total_lsoas) * 100,
+
+    table_value = sprintf(
+      "%s (%.1f%%)",
+      scales::comma(n),
+      percentage
+    )
+  ) %>%
+  dplyr::ungroup()
+
+# Convert into the final 12-row table
+bilisa_table <- bilisa_counts %>%
+  dplyr::mutate(
+    Analysis = factor(
+      Analysis,
+      levels = analysis_order
+    ),
+
+    Cluster = factor(
+      Cluster,
+      levels = cluster_order
+    )
+  ) %>%
+  dplyr::arrange(
+    Analysis,
+    Cluster
+  ) %>%
+  dplyr::select(
+    Analysis,
+    Cluster,
+    table_value
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = Cluster,
+    values_from = table_value
+  ) %>%
+  dplyr::select(
+    Analysis,
+    `High-High`,
+    `High-Low`,
+    `Low-High`,
+    `Low-Low`,
+    `Not significant`
+  ) %>%
+  dplyr::mutate(
+    Analysis = as.character(Analysis)
+  )
+
+bilisa_table
+```
+
+### 9.3. Low High BiLISA
+
+```{r}
+# Function to compare the Low access–High SUHII and
+# Low access–High IMD clusters for the same transport mode
+create_priority_two_combined <- function(suhii_object, imd_object) {
+
+  suhii_object$data %>%
+    dplyr::select(
+      lsoa21cd,
+      suhii_cluster = bilisa_cluster
+    ) %>%
+
+    # Join the matching IMD BiLISA classification by LSOA code
+    dplyr::left_join(
+      imd_object$data %>%
+        sf::st_drop_geometry() %>%
+        dplyr::select(
+          lsoa21cd,
+          imd_cluster = bilisa_cluster
+        ),
+      by = "lsoa21cd"
+    ) %>%
+
+    # Identify whether each LSOA belongs to either or both
+    # Low access–High contextual-variable clusters
+    dplyr::mutate(
+      two_combined_class = dplyr::case_when(
+
+        suhii_cluster == "Low-High" &
+          imd_cluster == "Low-High" ~
+          "High SUHII and IMD",
+
+        suhii_cluster == "Low-High" ~
+          "High SUHII",
+
+        imd_cluster == "Low-High" ~
+          "High IMD",
+
+        TRUE ~ "Not Significant"
+      ),
+
+      # Set the legend order
+      two_combined_class = factor(
+        two_combined_class,
+        levels = c(
+          "High SUHII and IMD",
+          "High SUHII",
+          "High IMD",
+          "Not Significant"
+        )
+      )
+    )
+}
+
+
+# Public transport
+two_combined_15_pt <- create_priority_two_combined(
+  suhii_object = bilisa_15_pt_suhii,
+  imd_object = bilisa_15_pt_imd
+)
+
+# Walking
+two_combined_15_walk <- create_priority_two_combined(
+  suhii_object = bilisa_15_walk_suhii,
+  imd_object = bilisa_15_walk_imd
+)
+
+# Cycling
+two_combined_15_cycle <- create_priority_two_combined(
+  suhii_object = bilisa_15_cycle_suhii,
+  imd_object = bilisa_15_cycle_imd
+)
+```
+
+```{r}
+# Colours for the two_combined classification
+two_combined_colours <- c(
+  "High SUHII and IMD" = "#7F0000",
+  "High SUHII" = "#D73027",
+  "High IMD" = "#F4A582",
+  "Not Significant" = "grey95"
+)
+
+
+# Function to create one map with all combined
+create_two_combined_map <- function(data) {
+
+  tm_shape(data) +
+    tm_fill(
+      fill = "two_combined_class",
+      fill.scale = tm_scale_categorical(
+        values = two_combined_colours
+      ),
+      fill.legend = tm_legend_hide()
+    ) +
+
+    # Add Greater London boundary
+    tm_shape(london_boundary) +
+    tm_borders(
+      col = "grey30",
+      lwd = 1
+    ) +
+
+    tm_layout(
+      frame = FALSE,
+      bg.color = "white",
+      outer.margins = 0
+    )
+}
+
+
+# Create the three maps
+two_combined_15_pt_map <- create_two_combined_map(
+  two_combined_15_pt
+)
+
+two_combined_15_walk_map <- create_two_combined_map(
+  two_combined_15_walk
+)
+
+two_combined_15_cycle_map <- create_two_combined_map(
+  two_combined_15_cycle
+)
+
+
+# Convert tmap maps into grobs for cowplot
+two_combined_15_grobs <- list(
+  tmap::tmap_grob(two_combined_15_pt_map),
+  tmap::tmap_grob(two_combined_15_walk_map),
+  tmap::tmap_grob(two_combined_15_cycle_map)
+)
+
+
+# Combine the three maps
+two_combined_15_maps <- cowplot::plot_grid(
+  plotlist = two_combined_15_grobs,
+  ncol = 1,
+  labels = c("a", "b", "c"),
+  label_size = 12,
+  align = "v",
+  axis = "lr"
+)
+
+
+# Create a shared legend
+two_combined_legend_data <- data.frame(
+  two_combined_class = factor(
+    names(two_combined_colours),
+    levels = names(two_combined_colours)
+  ),
+  x = 1,
+  y = seq_along(two_combined_colours)
+)
+
+two_combined_legend_plot <- ggplot(
+  two_combined_legend_data,
+  aes(x = x, y = y, fill = two_combined_class)
+) +
+  geom_point(
+    shape = 22,
+    size = 8,
+    colour = NA
+  ) +
+  scale_fill_manual(
+    values = two_combined_colours,
+    breaks = names(two_combined_colours),
+    drop = FALSE,
+    name = "BiLISA Clusters"
+  ) +
+  guides(
+    fill = guide_legend(
+      override.aes = list(
+        shape = 22,
+        size = 8,
+        colour = NA
+      )
+    )
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(size = 11),
+    legend.text = element_text(size = 9),
+    legend.key.height = grid::unit(0.65, "cm"),
+    legend.key.width = grid::unit(0.65, "cm")
+  )
+
+
+shared_two_combined_legend <- cowplot::get_legend(
+  two_combined_legend_plot,
+  legend = "right"
+)
+
+
+# Add shared legend
+two_combined_15_final_body <- cowplot::plot_grid(
+  two_combined_15_maps,
+  shared_two_combined_legend,
+  ncol = 2,
+  rel_widths = c(0.76, 0.24)
+)
+
+
+# Add overall figure title
+two_combined_15_final <- cowplot::ggdraw() +
+  cowplot::draw_label(
+    paste0(
+      "15-minute BiLISA Clusters of\n",
+      "Low-Accessibility–High-SUHII and/or High-IMD"
+    ),
+    x = 0.5,
+    y = 0.98,
+    hjust = 0.5,
+    fontface = "bold",
+    size = 14
+  ) +
+  cowplot::draw_plot(
+    two_combined_15_final_body,
+    x = 0,
+    y = 0,
+    width = 1,
+    height = 0.93
+  )
+
+
+# Display final figure
+two_combined_15_final
+```
+
+```{r}
+# save as PNG
+ggsave(
+  filename = "figures/Fig11_BiLISA_15_min_Combined2.png",
+  plot = two_combined_15_final,
+  width = 9,
+  height = 11,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
+```
+
+```{r}
+# Create the combined classifications
+
+# Public transit
+two_combined_60_pt <- create_priority_two_combined(
+  suhii_object = bilisa_60_pt_suhii,
+  imd_object = bilisa_60_pt_imd
+)
+
+# Walking
+two_combined_60_walk <- create_priority_two_combined(
+  suhii_object = bilisa_60_walk_suhii,
+  imd_object = bilisa_60_walk_imd
+)
+
+# Cycling
+two_combined_60_cycle <- create_priority_two_combined(
+  suhii_object = bilisa_60_cycle_suhii,
+  imd_object = bilisa_60_cycle_imd
+)
+
+
+
+# Create  three maps 
+two_combined_60_pt_map <- create_two_combined_map(
+  two_combined_60_pt
+)
+
+two_combined_60_walk_map <- create_two_combined_map(
+  two_combined_60_walk
+)
+
+two_combined_60_cycle_map <- create_two_combined_map(
+  two_combined_60_cycle
+)
+
+
+# Convert tmap objects into grobs for cowplot 
+two_combined_60_grobs <- list(
+  tmap::tmap_grob(two_combined_60_pt_map),
+  tmap::tmap_grob(two_combined_60_walk_map),
+  tmap::tmap_grob(two_combined_60_cycle_map)
+)
+
+
+# Arrange vertically:
+# a = public transit
+# b = walking
+# c = cycling
+
+two_combined_60_maps <- cowplot::plot_grid(
+  plotlist = two_combined_60_grobs,
+  ncol = 1,
+  labels = c("a", "b", "c"),
+  label_size = 12,
+  align = "v",
+  axis = "lr"
+)
+
+
+# Add the same shared legend  
+two_combined_60_final_body <- cowplot::plot_grid(
+  two_combined_60_maps,
+  shared_two_combined_legend,
+  ncol = 2,
+  rel_widths = c(0.76, 0.24)
+)
+
+
+# Add the big title
+two_combined_60_final <- cowplot::ggdraw() +
+  cowplot::draw_label(
+    paste0(
+      "60-minute BiLISA Clusters of\n",
+      "Low Accessibility–High SUHII and/or High IMD"
+    ),
+    x = 0.5,
+    y = 0.98,
+    hjust = 0.5,
+    fontface = "bold",
+    size = 14
+  ) +
+  cowplot::draw_plot(
+    two_combined_60_final_body,
+    x = 0,
+    y = 0,
+    width = 1,
+    height = 0.93
+  )
+
+
+two_combined_60_final
+```
+
+```{r}
+# save as PNG
+ggsave(
+  filename = "figures/Fig12_BiLISA_60_min_Combined2.png",
+  plot = two_combined_60_final,
+  width = 9,
+  height = 11,
   units = "in",
   dpi = 300,
   bg = "white"
