@@ -3,7 +3,7 @@
 ---
 
 ## Overview
-
+This is a repository holding all the code to run the full analysis. This is fully reproducible through the Google Earth Engine platform and R, where pre registration of accounts and installations is required.
 
 ## Data Sources
 |Data Type|Name|Description|Source|Purpose|
@@ -23,16 +23,16 @@
 ## Repository Structure
 ```
 london-cooling-access-equity/
-├── 1_Data_Filter_London.Rmd                           # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
-├── 1a_Map_Study_Area.Rmd                              # Mapping Study Area
-├── 2_GoogleEarthEngine_LST_UHI                        # Google Earth Engine code script for London LST; London LSOAs LST; SUHII
-├── 3_GoogleEarthEngine_greenspace_buffer_LST          # Google Earth Engine code script for LST of greenspaces > 2ha and its corresponding buffer rings (30m, 0-900m) 
-├── 4_Quantify_Urban_Heat_Park_Cooling.Rmd             # Urban Heat and Park Cooling Metrics; Identify Cooling Effective UGS
-├── 5_Multimodal_Travel_Time_r5r.Rmd                   # r5r Travel Time Matrices
-├── 5a_Map_Travel_Time_Cummulative_Accessibility.Rmd   # Mapping Travel Time derived from the above Rmd
-├── 6_Statistical_Analyses.Rmd                         # Statistical Analyses Performing Regression Modelling and Spatial Clustering Analysis
-├── data/                                              # Folder containing all data files used for this study, available to download below under Data Availability
-├── figures/                                           # Figures presented in the dissertation document
+├── 1_Data_Filter_London.Rmd                              # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
+├── 1a_Map_Study_Area.Rmd                                 # Mapping Study Area
+├── 2_GoogleEarthEngine_LST_UHI                           # Google Earth Engine code script for London LST; London LSOAs LST; SUHII
+├── 3_GoogleEarthEngine_greenspace_buffer_LST             # Google Earth Engine code script for LST of greenspaces > 2ha and its corresponding buffer rings (30m, 0-900m) 
+├── 4_Quantify_Urban_Heat_Park_Cooling.Rmd                # Urban Heat and Park Cooling Metrics; Identify Cooling Effective UGS
+├── 5_Multimodal_Travel_Time_r5r.Rmd                      # r5r Travel Time Matrices; Minimum travel time and cumulative opportunity accessibility scores
+├── 5a_Map_Travel_Time_Cummulative_Accessibility.Rmd      # Mapping accessibility indicators derived from 5_Multimodal_Travel_Time_r5r.Rmd 
+├── 6_Statistical_Analyses.Rmd                            # Statistical Analyses Performing Regression Modelling and Spatial Clustering Analysis
+├── data/                                                 # Folder containing all data files used for this study, available to download below under Data Availability
+├── figures/                                              # Figures presented in the dissertation document
 |   ├── Fig1_Study_Area.png
 |   ├── Fig2_Mean_LST_Greenspace_2ha_map.png
 |   ├── Fig3_Buffer_Schematic_Diagram.png
@@ -55,21 +55,28 @@ The required full project data can be downloaded here: [Download Project Data](h
 After downloading, place it in the project directory using the following structure:
 ```
 data/
-├── raw_data/                                          # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 
-├── gla/
-├── lsoa_london/                                       # LSOA boundary shapefile filtered to London only (large file - gitignored)
-├── London_LSOA_LST_SUHI/                              # LST and SUHII data retreived from Google Earth Engine (large file - gitignored)
-├── London_LST_median.tif                              # Median LST raster data for Greater London retreived from Google Earth Engine
-├── greenspace_london/                                 # Greenspace polygons shapefile filtered to London only (large file - gitignored)
-├── greenspace_london_2ha/                             # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
-├── greenspace_buffer_LST/                             # Green space LST and Green space Buffer LST (30m, 0-900m) retreived from Google Earth Engine (large file - gitignored)
-├── cooling_effective_UGS/
-├── london_lsoa_pop_weighted_centroids/
-├── origins_destinations/
-└── r5r/                                          # Data folder for r5r (large file - gitignored)
-|   ├── greater-london-260414.osm.pbf             # Road network data
-|   ├── gtfs_rail.zip                             # Rail GTFS data
-|   └── itm_london_gtfs.zip                       # Bus GTFS data
+├── raw_data/                                             # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 
+├── gla/                                                  # Greater London boundary shapefile 
+├── lsoa_london/                                          # LSOA boundary shapefile filtered to London only (large file - gitignored)
+├── London_LSOA_LST_SUHI/                                 # LST and SUHII data retreived from Google Earth Engine (large file - gitignored)
+├── London_LST_median.tif                                 # Median LST raster data for Greater London retreived from Google Earth Engine
+├── greenspace_london_2ha/                                # Greenspace polygons shapefile filtered to >2ha and London only (large file - gitignored)
+├── greenspace_buffer_LST/                                # Green space LST and Green space Buffer LST (30m, 0-900m) retreived from Google Earth Engine (large file - gitignored)
+├── cooling_effective_UGS/                                # 
+├── london_lsoa_pop_weighted_centroids/                   # Population weighted centroids for LSOAs
+├── origins_destinations/                                 # Origins and Destinations for r5r routing
+├── r5r/                                                  # Data folder for r5r (large file - gitignored)
+|   ├── greater-london-260414.osm.pbf                     # Road network data
+|   ├── gtfs_rail.zip                                     # Rail GTFS data
+|   └── itm_london_gtfs.zip                               # Bus GTFS data
+├── r5r_TTM/                                              # r5r raw travel time matrices
+|   ├── r5r_TTM_PT_raw.rds                                # r5r Public Transit raw travel time matrices
+|   ├── r5r_TTM_walk_raw.rds                              # r5r Walking raw travel time matrices
+|   └── r5r_TTM_cycle_raw.rds                             # r5r Cycling raw travel time matrices
+├── multimodal_accessibility_lsoa.gpkg/                   # Minimum travel time and cummulative accessibility scores
+├── census2021/                                           # Census 2021 raw dataset for population density, age, ethnic groups 
+├── IMD_2025.csv                                          # IMD 2025 scores raw dataset
+└── map.graph                                             # Adjacency graph for Bayesian BYM2 spatial regression model
 ```
 
-The analysis and preprocessing code scripts are to be stored locally under *the data/* directory
+The analysis and preprocessing code scripts are to be stored locally under the *data/* directory
