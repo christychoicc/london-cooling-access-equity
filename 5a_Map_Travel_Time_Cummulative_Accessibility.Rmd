@@ -107,7 +107,7 @@ min_travel_time <- ggplot(travel_time_long) +
     colour = NA
   ) +
   scale_fill_viridis_c(
-    option = "inferno",
+    option = "rocket",
     direction = -1,
     limits = c(0, 60),
     breaks = seq(0, 60, 10),
@@ -221,7 +221,7 @@ access_map <- function(data, variable, mode_title, threshold_title) {
       linewidth = 0
     ) +
     scale_fill_viridis_c(
-      option = "inferno",
+      option = "rocket",
       limits = c(0, 100),
       breaks = c(0, 25, 50, 75, 100),
       labels = c("0", "25", "50", "75", "100+"),

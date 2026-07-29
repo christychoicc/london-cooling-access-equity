@@ -272,7 +272,7 @@ suhii_tm
 ```{r}
 # save as png
 ggsave(
-  "figures/Fig3_LSOA_SUHII.png",
+  "figures/Fig7_LSOA_SUHII.png",
   plot = suhii_tm,
   width = 11.69,
   height = 8.27,
