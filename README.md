@@ -1,23 +1,9 @@
-# Assessing Equitable Multimodal Accessibility to Cooling Effective Urban Green Spaces: A Case Study of London
+# Multimodal Accessibility and Spatial Inequality in Cooling-Effective Urban Green Space: A Case Study of London
 
 ---
 
 ## Overview
-This is a repository holding all the code to run the full analysis. This is fully reproducible through the Google Earth Engine platform and R, where pre registration of accounts and installations is required.
-
-## Data Sources
-|Data Type|Name|Description|Source|Purpose|
-|---|---|---|---|---|
-|Remote Sensing Data|Landsat 8/9 Collection 2 Level 2|Relevant bands will be used to derive LST for summer periods|[View Link](https://developers.google.com/earth-engine/datasets/catalog/LANDSAT_LC08_C02_T1_L2)|Obtain Land Surface Temperature (LST), SUHII and PCI|
-|GTFS (Timetable) Data|Bus Open Data Service|Ready-made GTFS feed for bus timetable|[View Link](https://data.bus-data.dft.gov.uk/timetable/download/)|Bus timetable GTFS for r5r|
-|Rail Timetable Data|National Rail Timetable Data|Train timetable data to be used alongside bus services, including Elizabeth Line and London Overgrounds|[View Link](https://opendata.nationalrail.co.uk/)|Train timetable to convert to GTFS for r5r|
-|Road Network Data|OpenStreetMap, Greater London|Road network data in .pbf format|[View Link](https://download.geofabrik.de/europe/united-kingdom/england/greater-london.html)|Road network for r5r|
-|Polygons/ Points|OS Open Greenspace|Accessible greenspace and its access points (parks, playing fields, etc.)|[View Link](https://www.ordnancesurvey.co.uk/products/os-open-greenspace)|Identify greenspace polygons for GEE, accessibility routing destination of greenspace access points|
-|Points|Lower layer Super Output Areas (December 2021) EW Population Weighted Centroids|LSOA population weighted centroids points|[View Link](https://geoportal.statistics.gov.uk/search?tags=population%2520weighted%2520centroid)|London LSOA centroids for origins for accessibility analysis|
-|Polygons|Greater London Boundary|Greater London Boundary|[View Link](https://data.london.gov.uk/dataset/statistical-gis-boundary-files-for-london-20od9/)|Filter/ clip boundaries to London|
-|Polygons|Lower layer Super Output Areas (December 2021) EW |LSOA Boundaries|[View Link](https://geoportal.statistics.gov.uk/datasets/2bbaef5230694f3abae4f9145a3a9800_0/explore?location=52.837550%2C-2.489483%2C6)|Filtered for London LSOAs only|
-|Socioeconomic data|Indicies of Multiple Depriviation (IMD 2025)|LSOA-level deprivation indicies for England|[View Link](https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025)|Socioeconomic vulnerability and compare accessibility to cool greenspace across more/ less deprived neighbourhoods|
-|Socioeconomic data|Census Data||||
+This is a code repository for the dissertation submitted in part requirement for the MSc in the Centre for Advanced Spatial Analysis, Bartlett Faculty of the Built Environment, UCL.
 
 
 ## Repository Structure
@@ -34,20 +20,24 @@ london-cooling-access-equity/
 ├── data/                                                 # Folder containing all data files used for this study, available to download below under Data Availability
 ├── figures/                                              # Figures presented in the dissertation document
 |   ├── Fig1_Study_Area.png
-|   ├── Fig2_Mean_LST_Greenspace_2ha_map.png
-|   ├── Fig3_Buffer_Schematic_Diagram.png
-|   ├── Fig4_Illustration_of_LST_change_curve_of_park_cooling_process_Peng_et_al_2021.jpg
-|   ├── Fig5_Origin_Destinations.png
-|   ├── Fig6_Spearman_Heatmap.png
-|   ├── Fig7_LSOA_SUHII.png
-|   ├── Fig8_Cooling_Effective_UGS_PCI_map.png
-|   ├── Fig9_Minimum_Travel_Time_by_Mode.png
-|   ├── Fig10_Cummulative_Opportunity_Map.png
-|   ├── Fig11_BiLISA_15_Accessibility_SUHII_IMD.png
-|   └── Fig12_BiLISA_60_Accessibility_SUHII_IMD.png
+|   ├── Fig2_Methodology_Workflow.jpg
+|   ├── Fig3_Mean_LST_Greenspace_2ha_map.png
+|   ├── Fig4_Buffer_Schematic_Diagram.png
+|   ├── Fig5_Illustration_of_LST_change_curve_of_park_cooling_process_Peng_et_al_2021.jpg
+|   ├── Fig6_Origin_Destinations.png
+|   ├── Fig7_Spearman_Heatmap.png
+|   ├── Fig8_LSOA_SUHII.png
+|   ├── Fig9_Cooling_Effective_UGS_PCI_map.png
+|   ├── Fig10_Minimum_Travel_Time_by_Mode.png
+|   ├── Fig11_Cummulative_Opportunity_Map.png
+|   ├── Fig12_BiLISA_15_min_Combined.png
+|   ├── Fig13_BiLISA_60_min_Combined.png
+|   ├── Fig_Appendix_BiLISA_15_min_Combined.png
+|   └── Fig_Appendix_BiLISA_60_min_Combined.png
 ```
 
 ## Data Availability
+
 Large data files exceeding GitHub's recommended file size limits (50 MB) are not included in this repository.
 
 The required full project data can be downloaded here: [Download Project Data](https://liveuclac-my.sharepoint.com/:f:/g/personal/ucfncc0_ucl_ac_uk/IgDHGUhBBPvyQJA3EktcxJIAAWQMLlG2khmJH0eewUCtqys?e=4hTciO)
@@ -79,4 +69,19 @@ data/
 └── map.graph                                             # Adjacency graph for Bayesian BYM2 spatial regression model
 ```
 
-The analysis and preprocessing code scripts are to be stored locally under the *data/* directory
+The project data are to be stored locally under the *data/* directory
+
+### Data Sources
+Original sources of data used to produce this study is listed as below: 
+|Name|Description|Source|Purpose|
+|---|---|---|---|
+|Greater London Boundary|Greater London Boundary|[Greater London Authority (2018)](https://data.london.gov.uk/dataset/statistical-gis-boundary-files-for-london-20od9/)|Filter/ clip boundaries to London|
+|Lower layer Super Output Areas (December 2021) EW |LSOA Boundaries|[Office for National Statistics (2024)](https://geoportal.statistics.gov.uk/datasets/2bbaef5230694f3abae4f9145a3a9800_0/explore?location=52.837550%2C-2.489483%2C6)|Filtered for London LSOAs only|
+|Landsat 8/9 Collection 2 Level 2|Relevant bands will be used to derive LST for summer periods|[Earth Resources Observation and Science (EROS) Center. (2020)](https://developers.google.com/earth-engine/datasets/catalog/LANDSAT_LC08_C02_T1_L2)|Obtain Land Surface Temperature (LST), SUHII and PCI|
+|OS Open Greenspace|Accessible greenspace and its access points (parks, playing fields, etc.)|[Ordnance Survey (2026)](https://www.ordnancesurvey.co.uk/products/os-open-greenspace)|Identify greenspace polygons for GEE, accessibility routing destination of greenspace access points|
+|OpenStreetMap, Greater London|Road network data in .pbf format|[Geofabrik and OSM Contributors (2025)](https://download.geofabrik.de/europe/united-kingdom/england/greater-london.html)|Road network for r5r|
+|Bus Open Data Service|GTFS feed for bus timetable|[Department for Transport (2026)](https://data.bus-data.dft.gov.uk/timetable/download/)|Bus timetable GTFS for r5r|
+|National Rail Timetable Data|Train timetable data to be used alongside bus services, including Elizabeth Line and London Overgrounds|[Rail Delivery Group (2026)](https://opendata.nationalrail.co.uk/)|Train timetable to convert to GTFS for r5r|
+|Lower layer Super Output Areas (December 2021) EW Population Weighted Centroids|LSOA population weighted centroids points|[Office for National Statistics (2026)](https://geoportal.statistics.gov.uk/search?tags=population%2520weighted%2520centroid)|London LSOA centroids for origins for accessibility analysis|
+|Indicies of Multiple Depriviation (IMD 2025)|LSOA-level deprivation indicies for England|[Ministry of Housing, Communities and Local Government (2025)](https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025)|Socioeconomic vulnerability and compare accessibility to cool greenspace across more/ less deprived neighbourhoods|
+|Census 2021||[Office for National Statistics (2021)](https://www.nomisweb.co.uk/sources/census_2021)||
