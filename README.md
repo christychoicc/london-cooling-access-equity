@@ -73,15 +73,15 @@ The project data are to be stored locally under the *data/* directory
 
 ### Data Sources
 Original sources of data used to produce this study is listed as below: 
-|Name|Description|Source|Purpose|
-|---|---|---|---|
-|Greater London Boundary|Greater London Boundary|[Greater London Authority (2018)](https://data.london.gov.uk/dataset/statistical-gis-boundary-files-for-london-20od9/)|Filter/ clip boundaries to London|
-|Lower layer Super Output Areas (December 2021) EW |LSOA Boundaries|[Office for National Statistics (2024)](https://geoportal.statistics.gov.uk/datasets/2bbaef5230694f3abae4f9145a3a9800_0/explore?location=52.837550%2C-2.489483%2C6)|Filtered for London LSOAs only|
-|Landsat 8/9 Collection 2 Level 2|Relevant bands will be used to derive LST for summer periods|[Earth Resources Observation and Science (EROS) Center. (2020)](https://developers.google.com/earth-engine/datasets/catalog/LANDSAT_LC08_C02_T1_L2)|Obtain Land Surface Temperature (LST), SUHII and PCI|
-|OS Open Greenspace|Accessible greenspace and its access points (parks, playing fields, etc.)|[Ordnance Survey (2026)](https://www.ordnancesurvey.co.uk/products/os-open-greenspace)|Identify greenspace polygons for GEE, accessibility routing destination of greenspace access points|
-|OpenStreetMap, Greater London|Road network data in .pbf format|[Geofabrik and OSM Contributors (2025)](https://download.geofabrik.de/europe/united-kingdom/england/greater-london.html)|Road network for r5r|
-|Bus Open Data Service|GTFS feed for bus timetable|[Department for Transport (2026)](https://data.bus-data.dft.gov.uk/timetable/download/)|Bus timetable GTFS for r5r|
-|National Rail Timetable Data|Train timetable data to be used alongside bus services, including Elizabeth Line and London Overgrounds|[Rail Delivery Group (2026)](https://opendata.nationalrail.co.uk/)|Train timetable to convert to GTFS for r5r|
-|Lower layer Super Output Areas (December 2021) EW Population Weighted Centroids|LSOA population weighted centroids points|[Office for National Statistics (2026)](https://geoportal.statistics.gov.uk/search?tags=population%2520weighted%2520centroid)|London LSOA centroids for origins for accessibility analysis|
-|Indicies of Multiple Depriviation (IMD 2025)|LSOA-level deprivation indicies for England|[Ministry of Housing, Communities and Local Government (2025)](https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025)|Socioeconomic vulnerability and compare accessibility to cool greenspace across more/ less deprived neighbourhoods|
-|Census 2021||[Office for National Statistics (2021)](https://www.nomisweb.co.uk/sources/census_2021)||
+|Name|Source|
+|---|---|
+|Greater London Boundary|[Greater London Authority (2018)](https://data.london.gov.uk/dataset/statistical-gis-boundary-files-for-london-20od9/)|
+|Lower layer Super Output Areas (December 2021) EW|[Office for National Statistics (2024)](https://geoportal.statistics.gov.uk/datasets/2bbaef5230694f3abae4f9145a3a9800_0/explore?location=52.837550%2C-2.489483%2C6)|
+|Landsat 8/9 Collection 2 Level 2|[Earth Resources Observation and Science (EROS) Center. (2020)](https://developers.google.com/earth-engine/datasets/catalog/LANDSAT_LC08_C02_T1_L2)|
+|OS Open Greenspace|[Ordnance Survey (2026)](https://www.ordnancesurvey.co.uk/products/os-open-greenspace)|
+|OpenStreetMap, Greater London|[Geofabrik and OSM Contributors (2025)](https://download.geofabrik.de/europe/united-kingdom/england/greater-london.html)|
+|Bus Open Data Service|[Department for Transport (2026)](https://data.bus-data.dft.gov.uk/timetable/download/)|
+|National Rail Timetable Data|[Rail Delivery Group (2026)](https://opendata.nationalrail.co.uk/)|
+|Lower layer Super Output Areas (December 2021) EW Population Weighted Centroids|[Office for National Statistics (2026)](https://geoportal.statistics.gov.uk/search?tags=population%2520weighted%2520centroid)|
+|Indices of Multiple Deprivation (IMD 2025)|[Ministry of Housing, Communities and Local Government (2025)](https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025)|
+|Census 2021|[Office for National Statistics (2021)](https://www.nomisweb.co.uk/sources/census_2021)|
