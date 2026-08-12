@@ -93,25 +93,22 @@ travel_time_long <- multimodal_accessibility_lsoa %>%
     mode = factor(
       mode,
       levels = c("Public Transit", "Walking", "Cycling")
-    ),
-    
-    # Cap values above 60 without changing the original variable
-    travel_time_plot = pmin(travel_time_min, 60)
+    )
   )
 ```
 
 ```{r}
 min_travel_time <- ggplot(travel_time_long) +
   geom_sf(
-    aes(fill = travel_time_plot),
+    aes(fill = travel_time_min),
     colour = NA
   ) +
   scale_fill_viridis_c(
     option = "rocket",
     direction = -1,
-    limits = c(0, 60),
-    breaks = seq(0, 60, 10),
-    labels = seq(0, 60, 10),
+    limits = c(0, 50),
+    breaks = seq(0, 50, 10),
+    labels = seq(0, 50, 10),
     oob = scales::squish,
     na.value = "grey90"
   ) +
@@ -174,7 +171,7 @@ min_travel_time
 ```{r}
 # save as PNG
 ggsave(
-  filename = "figures/Fig9_Minimum_Travel_Time_by_Mode.png",
+  filename = "figures/Fig10_Minimum_Travel_Time_by_Mode.png",
   plot = min_travel_time,
   width = 11.69, 
   height = 5.5,
@@ -362,7 +359,7 @@ access_score_maps
 ```{r}
 # save as PNG
 ggsave(
-  filename = "figures/Fig10_Cummulative_Opportunity_Map.png",
+  filename = "figures/Fig11_Cummulative_Opportunity_Map.png",
   plot = access_score_maps,
   width = 8,
   height = 9,

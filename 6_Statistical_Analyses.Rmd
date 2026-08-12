@@ -502,7 +502,7 @@ variables_dist_hist <- ggplot(numeric_long, aes(x = value)) +
   theme_minimal() +
   labs(title = "Histograms of Numerical Variables")
 
-variables_dist_hist
+#variables_dist_hist
 ```
 
 ```{r, eval=FALSE}
@@ -1167,9 +1167,24 @@ Bayesian spatial multilevel mixed-effects model incoporating BMY2 with `INLA` pa
 ```{r}
 # https://www.r-inla.org/download/index.html
 
-install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
+#install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
 
-#install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/testing"), dep=TRUE)
+install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/testing"), dep=TRUE)
+```
+
+```{r}
+# reload packages (often need to restart R)
+library(ggplot2)
+library(tmap)
+library(cowplot)
+library(sf)
+library(spdep)
+library(dplyr)
+library(tidyverse)
+library(broom)
+library(INLA)
+library(INLAtools)
+library(performance)
 ```
 
 ```{r}
@@ -1178,7 +1193,7 @@ packageVersion("INLA")
 ```
 
 ```{r}
-library(INLA)
+# check INLA
 # inla.setOption(inla.mode="experimental") # if crash add this on
 INLA::inla.version()
 ```
@@ -1417,17 +1432,34 @@ model_60_walk_bym2 <- INLA::inla(
 #summary(model_60_walk_bym2)
 ```
 
-**15 cycle**
+Save as a RDS object:
 
 ```{r}
-install.packages("INLA", repos = c(getOption("repos"), INLA = "https://inla.r-inla-download.org/R/testing"), dependencies = TRUE)
+saveRDS(model_15_pt_bym2, "data/BYM2/model_15_pt_bym2.rds")
+saveRDS(model_60_pt_bym2, "data/BYM2/model_60_pt_bym2.rds")
+saveRDS(model_15_walk_bym2, "data/BYM2//model_15_walk_bym2.rds")
+saveRDS(model_60_walk_bym2, "data/BYM2/model_60_walk_bym2.rds")
 ```
+
+```{r}
+# clear the bym2 memory
+rm(
+  model_15_pt_bym2,
+  model_60_pt_bym2,
+  model_15_walk_bym2,
+  model_60_walk_bym2
+)
+
+gc()
+```
+
+**15 cycle**
 
 ```{r}
 # run model
 model_15_cycle_bym2 <- INLA::inla(
   formula = formula_15_cycle,
-  family = "nbinomial",
+  family = "poisson",
   data = spatial_model_variables, 
   control.predictor = list(compute = TRUE),
   #control.compute = list(return.marginals.predictor = TRUE), 
@@ -1436,14 +1468,15 @@ model_15_cycle_bym2 <- INLA::inla(
   verbose = FALSE
 )
 
-summary(model_15_cycle_bym2)
+#summary(model_15_cycle_bym2)
+
+# save as RDS
+saveRDS(model_15_cycle_bym2, "data/BYM2/model_15_cycle_bym2.rds")
 ```
 
 **60 cycle**
 
 ```{r}
-library(INLA)
-
 # run model
 model_60_cycle_bym2 <- INLA::inla(
   formula = formula_60_cycle,
@@ -1457,6 +1490,19 @@ model_60_cycle_bym2 <- INLA::inla(
 )
 
 #summary(model_60_cycle_bym2)
+
+# save as RDS
+saveRDS(model_60_cycle_bym2,"data/BYM2/model_60_cycle_bym2.rds")
+```
+
+```{r}
+# reload
+model_15_pt_bym2    <- readRDS("data/BYM2/model_15_pt_bym2.rds")
+model_60_pt_bym2    <- readRDS("data/BYM2/model_60_pt_bym2.rds")
+model_15_walk_bym2  <- readRDS("data/BYM2/model_15_walk_bym2.rds")
+model_60_walk_bym2  <- readRDS("data/BYM2/model_60_walk_bym2.rds")
+model_15_cycle_bym2 <- readRDS("data/BYM2/model_15_cycle_bym2.rds")
+model_60_cycle_bym2 <- readRDS("data/BYM2/model_60_cycle_bym2.rds")
 ```
 
 ```{r}
@@ -1494,7 +1540,7 @@ fixed_effects_long <- lapply(names(bym2_models), function(model_name) {
       variable = variable_labels[term],
       cell = sprintf(
         "%.3f (%.3f, %.3f)",
-        # mean RR and the 95% CI
+        # mean IRR and the 95% CI
         exp(mean), exp(`0.025quant`), exp(`0.975quant`)
       )
     )
@@ -1507,48 +1553,93 @@ fixed_effects_table <- fixed_effects_long %>%
 
 knitr::kable(
   fixed_effects_table,
-  caption = "BYM2 Fixed Effects Posterior: Mean Rate Ratios and 95% Credible Intervals (CI)"
+  caption = "BYM2 Fixed Effects Mean Incidence Rate Ratios and 95% Credible Intervals (CI)"
 )
 ```
 
 ### 8.3. Validation Checks
 
-#### 8.3.1. Predictive Diagnostic Methods - CPO and PIT for all models
+#### 8.3.1. Diagnostic 
 
-Predictive measures can be used both to validate and to compare models and using marginal... DIC and CPO and PIT (Referencing from here: <https://www.math.ntnu.no/preprint/statistics/2008/S2-2008.pdf>)
+<https://becarioprecario.bitbucket.io/inla-gitbook/ch-INLA.html#sec:modelassess>
 
 ```{r}
 # List the current six models
 six_models <- list(
-  "15_pt"    = model_15_pt_bym2,
-  "60_pt"    = model_60_pt_bym2,
-  "15_walk"  = model_15_walk_bym2,
-  "60_walk"  = model_60_walk_bym2,
-  "15_cycle" = model_15_cycle_bym2,
-  "60_cycle" = model_60_cycle_bym2
+  "15 minute PT"    = model_15_pt_bym2,
+  "60 minute PT"    = model_60_pt_bym2,
+  "15 minute Walking"  = model_15_walk_bym2,
+  "60 minute Walking"  = model_60_walk_bym2,
+  "15 minute Cycling" = model_15_cycle_bym2,
+  "60 minute Cycling" = model_60_cycle_bym2
+)
+```
+
+```{r}
+# Adjusted PIT histograms
+
+png(
+  filename = "figures/Fig_Appendix_Adjusted_PIT_Histograms.png",
+  width = 2400,
+  height = 1600,
+  res = 300
 )
 
-# CPO/PIT summary table 
-cpo_pit_summary <- lapply(names(six_models), function(model_name) {
-  m <- six_models[[model_name]]
-  data.frame(
-    model = model_name,
-    # model-level predictive comparison score - CPO
-    sum_log_cpo = sum(log(m$cpo$cpo), na.rm = TRUE),
-    # PIT
-    mean_pit = mean(m$cpo$pit, na.rm = TRUE)
-  )
-}) %>% bind_rows()
-
-cpo_pit_summary
-
-# PIT histograms
 par(mfrow = c(2, 3), mar = c(3, 3, 2, 1))
+
 for (nm in names(six_models)) {
-  hist(six_models[[nm]]$cpo$pit, breaks = 20,
-       main = nm, xlab = "", ylab = "", col = "steelblue")
+
+  m <- six_models[[nm]]
+
+  # use valid CPO/PIT observations only
+  valid <- is.finite(m$cpo$pit) &
+           is.finite(m$cpo$cpo) &
+           m$cpo$cpo > 0 &
+           m$cpo$failure == 0
+
+  # adjusted PIT for discrete count data
+  adjusted_pit <- m$cpo$pit[valid] -
+                  0.5 * m$cpo$cpo[valid]
+
+  hist(
+    adjusted_pit,
+    breaks = seq(0, 1, by = 0.05),
+    probability = TRUE,
+    main = nm,
+    xlab = "Adjusted PIT",
+    ylab = "Density",
+    xlim = c(0, 1),
+    col = "steelblue"
+  )
+
+  abline(h = 1, lty = 2)
 }
+
+dev.off()
+
 par(mfrow = c(1, 1))
+```
+
+```{r}
+# summary of DIC, WAIC CPO and MLIK values
+model_summary <- lapply(names(six_models), function(model_name) {
+
+  m <- six_models[[model_name]]
+  valid_cpo <- is.finite(m$cpo$cpo) & m$cpo$cpo > 0
+
+  data.frame(
+    Model = model_name,
+    DIC = m$dic$dic,
+    WAIC = m$waic$waic,
+    Negative_sum_log_CPO = -sum(log(m$cpo$cpo[valid_cpo])),
+    Log_Marginal_Likelihood =
+      m$mlik[1, 1]
+  )
+
+}) %>%
+  dplyr::bind_rows()
+
+model_summary
 ```
 
 ```{r}
@@ -1934,6 +2025,7 @@ bilisa_weights <-  bilisa_nb %>%
 ### 9.1. Map SUHII
 
 ```{r}
+# code adpated from: 
 # https://r-spatial.github.io/spdep/reference/localmoran_bv.html
 
 bilisa_15_pt_suhii <- localmoran_bv(
@@ -1951,6 +2043,7 @@ head(bilisa_15_pt_suhii)
 ```
 
 ```{r}
+# to identify significant cluster only (keep p<0.05 only) 
 bilisa_cluster <- spdep::hotspot(
   bilisa_15_pt_suhii,
   Prname = "Pr(folded) Sim",
@@ -2115,7 +2208,7 @@ run_bilisa_map <- function(
     zero.policy = TRUE
   )
 
-  # Significant cluster classification
+  # to identify significant cluster only (keep p<0.05 only) 
   lisa_cluster <- spdep::hotspot(
     lisa_result,
     Prname = "Pr(folded) Sim",
@@ -2259,7 +2352,7 @@ bilisa_15_pt_suhii <- run_bilisa_map(
 bilisa_15_pt_suhii_map <- bilisa_15_pt_suhii$map
 
 # plot
-bilisa_15_pt_suhii_map
+#bilisa_15_pt_suhii_map
 ```
 
 ```{r}
@@ -2276,7 +2369,7 @@ bilisa_60_pt_suhii <- run_bilisa_map(
 bilisa_60_pt_suhii_map <- bilisa_60_pt_suhii$map
 
 # plot
-bilisa_60_pt_suhii_map
+#bilisa_60_pt_suhii_map
 ```
 
 ```{r}
@@ -2293,7 +2386,7 @@ bilisa_15_walk_suhii <- run_bilisa_map(
 bilisa_15_walk_suhii_map <- bilisa_15_walk_suhii$map
 
 # plot
-bilisa_15_walk_suhii_map
+#bilisa_15_walk_suhii_map
 ```
 
 ```{r}
@@ -2310,7 +2403,7 @@ bilisa_60_walk_suhii <- run_bilisa_map(
 bilisa_60_walk_suhii_map <- bilisa_60_walk_suhii$map
 
 # plot
-bilisa_60_walk_suhii_map
+#bilisa_60_walk_suhii_map
 ```
 
 ```{r}
@@ -2327,7 +2420,7 @@ bilisa_15_cycle_suhii <- run_bilisa_map(
 bilisa_15_cycle_suhii_map <- bilisa_15_cycle_suhii$map
 
 # plot
-bilisa_15_cycle_suhii_map
+#bilisa_15_cycle_suhii_map
 ```
 
 ```{r}
@@ -2344,7 +2437,7 @@ bilisa_60_cycle_suhii <- run_bilisa_map(
 bilisa_60_cycle_suhii_map <- bilisa_60_cycle_suhii$map
 
 # plot
-bilisa_60_cycle_suhii_map
+#bilisa_60_cycle_suhii_map
 ```
 
 ```{r}
@@ -2361,7 +2454,7 @@ bilisa_15_pt_imd <- run_bilisa_map(
 bilisa_15_pt_imd_map <- bilisa_15_pt_imd$map
 
 # plot
-bilisa_15_pt_imd_map
+#bilisa_15_pt_imd_map
 ```
 
 ```{r}
@@ -2378,7 +2471,7 @@ bilisa_60_pt_imd <- run_bilisa_map(
 bilisa_60_pt_imd_map <- bilisa_60_pt_imd$map
 
 # plot
-bilisa_60_pt_imd_map
+#bilisa_60_pt_imd_map
 ```
 
 ```{r}
@@ -2395,7 +2488,7 @@ bilisa_15_walk_imd <- run_bilisa_map(
 bilisa_15_walk_imd_map <- bilisa_15_walk_imd$map
 
 # plot
-bilisa_15_walk_imd_map
+#bilisa_15_walk_imd_map
 ```
 
 ```{r}
@@ -2412,7 +2505,7 @@ bilisa_60_walk_imd <- run_bilisa_map(
 bilisa_60_walk_imd_map <- bilisa_60_walk_imd$map
 
 # plot
-bilisa_60_walk_imd_map
+#bilisa_60_walk_imd_map
 ```
 
 ```{r}
@@ -2429,7 +2522,7 @@ bilisa_15_cycle_imd <- run_bilisa_map(
 bilisa_15_cycle_imd_map <- bilisa_15_cycle_imd$map
 
 # plot
-bilisa_15_cycle_imd_map
+#bilisa_15_cycle_imd_map
 ```
 
 ```{r}
@@ -2446,7 +2539,7 @@ bilisa_60_cycle_imd <- run_bilisa_map(
 bilisa_60_cycle_imd_map <- bilisa_60_cycle_imd$map
 
 # plot
-bilisa_60_cycle_imd_map
+#bilisa_60_cycle_imd_map
 ```
 
 **Cowplot Combine Maps**
@@ -2580,7 +2673,7 @@ bilisa_15_final <- cowplot::plot_grid(
 bilisa_15_final
 ```
 
-```{r}
+```{r, eval= FALSE}
 # save as png
 ggsave(
   filename = "figures/Fig_Appendix_BiLISA_15_min_Combined.png",
@@ -2657,7 +2750,7 @@ bilisa_60_final <- cowplot::plot_grid(
 bilisa_60_final
 ```
 
-```{r}
+```{r, eval=FALSE}
 ggsave(
   filename = "figures/Fig_Appendix_BiLISA_60_min_Combined.png",
   plot = bilisa_60_final,
@@ -3002,7 +3095,7 @@ two_combined_15_final <- cowplot::ggdraw() +
   cowplot::draw_label(
     paste0(
       "15-minute BiLISA Clusters of\n",
-      "Low-Accessibility–High-SUHII and/or High-IMD"
+      "Low-Accessibility–High SUHII and/or High IMD"
     ),
     x = 0.5,
     y = 0.98,
@@ -3026,7 +3119,7 @@ two_combined_15_final
 ```{r}
 # save as PNG
 ggsave(
-  filename = "figures/Fig11_BiLISA_15_min_Combined2.png",
+  filename = "figures/Fig12_BiLISA_15_min_Combined.png",
   plot = two_combined_15_final,
   width = 9,
   height = 11,
@@ -3130,10 +3223,10 @@ two_combined_60_final <- cowplot::ggdraw() +
 two_combined_60_final
 ```
 
-```{r}
+```{r, eval=FALSE}
 # save as PNG
 ggsave(
-  filename = "figures/Fig12_BiLISA_60_min_Combined2.png",
+  filename = "figures/Fig13_BiLISA_60_min_Combined.png",
   plot = two_combined_60_final,
   width = 9,
   height = 11,
@@ -3141,4 +3234,46 @@ ggsave(
   dpi = 300,
   bg = "white"
 )
+```
+
+### 9.4. Summary of overlap L-H clusters of High SUHII and IMD
+
+```{r}
+# Put all six overlap objects into a named list
+overlap_objects <- list(
+  "15-minute Public Transit" = two_combined_15_pt,
+  "15-minute Walking"          = two_combined_15_walk,
+  "15-minute Cycling"          = two_combined_15_cycle,
+  "60-minute Public Transit" = two_combined_60_pt,
+  "60-minute Walking"          = two_combined_60_walk,
+  "60-minute Cycling"          = two_combined_60_cycle
+)
+
+# Calculate number and percentage of London LSOAs
+# that are Low-High for BOTH SUHII and IMD
+overlap_summary <- dplyr::bind_rows(
+  
+  lapply(names(overlap_objects), function(x) {
+    
+    data <- overlap_objects[[x]] %>%
+      sf::st_drop_geometry()
+    
+    tibble::tibble(
+      Accessibility = x,
+      
+      overlap_n = sum(
+        data$two_combined_class == "High SUHII and IMD",
+        na.rm = TRUE
+      ),
+      
+      total_lsoas = nrow(data),
+      
+      overlap_percentage = 
+        overlap_n / total_lsoas * 100
+    )
+    
+  })
+)
+
+overlap_summary
 ```
