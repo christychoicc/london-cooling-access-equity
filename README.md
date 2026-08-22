@@ -8,16 +8,16 @@ This repository contains the code used for the dissertation submitted in part re
 ## Repository Structure
 ```
 london-cooling-access-equity/
-├── 1_Data_Preparation.Rmd                                # Markdown code for filtering data sets to London study area only for preprocessing in Google Earth Engine 
-├── 1a_Map_Study_Area.Rmd                                 # Mapping Study Area
-├── 2_GoogleEarthEngine_LST_Urban_Heat                    # Google Earth Engine code script for London LST; London LSOAs LST; Quantify urban heat (SUHII)
-├── 3_GoogleEarthEngine_Greenspace_Buffer_LST             # Google Earth Engine code script for LST of greenspaces > 2ha and its corresponding buffer rings (30m, 0-900m) 
-├── 4_Quantify_Park_Cooling.Rmd                           # Park Cooling Indicators; Identify Cooling Effective UGS
-├── 5_Multimodal_Accessibility_r5r.Rmd                    # r5r Travel Time Matrices; Minimum travel time and cumulative opportunity accessibility scores
-├── 5a_Map_Travel_Time_Cummulative_Accessibility.Rmd      # Mapping accessibility indicators derived from 5_Multimodal_Travel_Time_r5r.Rmd 
-├── 6_Statistical_Analyses.Rmd                            # Statistical Analyses Performing Regression Modelling and Spatial Clustering Analysis
-├── Adobe_Illustrator_Buffer_Schematic_Diagram.ai         # Adobe Illustrator file for green space buffer visualisation
-├── data/                                                 # Data files used for this study, full project data available to download below under Data Availability
+├── 1_Data_Preparation.Rmd                                
+├── 1a_Map_Study_Area.Rmd                                 
+├── 2_GoogleEarthEngine_LST_Urban_Heat                    
+├── 3_GoogleEarthEngine_Greenspace_Buffer_LST             
+├── 4_Quantify_Park_Cooling.Rmd                           
+├── 5_Multimodal_Accessibility_r5r.Rmd                   
+├── 5a_Map_Travel_Time_Cummulative_Accessibility.Rmd      
+├── 6_Statistical_Analyses.Rmd                            
+├── Adobe_Illustrator_Buffer_Schematic_Diagram.ai         # Adobe Illustrator file for green space buffer schematic visualisation
+├── data/                                                 # Data used for this study, full project data available to download below under Data Availability
 └── figures/                                              # Figures presented in the dissertation document
 ```
 
@@ -26,7 +26,7 @@ london-cooling-access-equity/
 The code scripts are structured in the order in which the analysis was performed. 
 
 ### 1. Data Preparation
-`1_Data_Preparation.Rmd` pre-process and filter datasets to the Greater London study area, and `1a_Map_Study_Area.Rmd`visualises the study area map and spatial context. 
+`1_Data_Preparation.Rmd` pre-process and filter datasets to the Greater London study area, and `1a_Map_Study_Area.Rmd` visualises the study area map and spatial context. 
 
 ### 2. Land Surface Temperature (LST) and Quantify Urban Heat
 `2_GoogleEarthEngine_LST_Urban_Heat.txt` is a Google Earth Engine script retrieving Landsat-9 LST data. It also calculates London-level and LSOA-level LST, and deriving surface urban heat intensity to quantify urban heat exposure.
