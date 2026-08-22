@@ -2,7 +2,7 @@
 title: "4_Quantify_Urban_Heat_Park_Cooling"
 ---
 
-This markdown file contains the full working code for ......
+This markdown contains the code for mapping spatial distribution of LST and SUHII (Section 1). The calculation for identifying cooling-effective urban green spaces and mapping approaches are in Section 2.
 
 ```{r}
 # remove objects from R environment and clear memory
@@ -26,8 +26,8 @@ library(tmap)
 library(cowplot)
 library(scales)
 library(RColorBrewer)
-library(ggtext) # text in plots
-library(showtext) # more fonts
+library(ggtext)
+library(showtext)
 ```
 
 ## Data Loading
@@ -64,7 +64,7 @@ greenspace <- st_read("data/greenspace_buffer_lst/greenspace_buffer_lst.shp") %>
   st_transform(.,27700)
 ```
 
-## 1. Urban Heat
+## 1. LST and Urban Heat
 
 **Map: Mean LST and Green Spaces Polygons**
 
@@ -72,7 +72,7 @@ greenspace <- st_read("data/greenspace_buffer_lst/greenspace_buffer_lst.shp") %>
 # Ensure consistent CRS 
 greenspace2ha <- st_transform(greenspace2ha, crs(london_lst))
 
-# Plot
+# plot
 lst_map <- ggplot() +
   geom_spatraster(data = london_lst) +
   geom_sf(
@@ -129,7 +129,7 @@ lst_map
 ```{r}
 # save as png
 ggsave(
-  filename = "figures/Fig2_Mean_LST_Greenspace_2ha_map.png",
+  filename = "figures/Fig3_Spatial_Distribution_LST.png",
   plot = lst_map,
   width = 11.69,
   height = 8.27,
@@ -141,13 +141,10 @@ ggsave(
 **Map: SUHII = LST (LSOA) - LST (London)**
 
 ```{r}
-# NYT colours for UHI 
 # Fix geometry
 lsoa_lst <- st_make_valid(lsoa_lst)
 
-# blue = cooler than London mean, red = hotter than London mean
-# diff_cols <- rev(brewer.pal(11, "RdBu"))
-# Muted teal–cream–coral colour scheme
+# use NYT colours for UHI 
 diff_cols <- c(
   "#006D6F",
   "#268D8B",
@@ -169,7 +166,7 @@ lims <- c(-10, 10)
 # colours group into 2°C intervals
 breaks_seq <- seq(-10, 10, by = 2)
 
-# Map
+# ggplot map
 map_plot <- ggplot(lsoa_lst) +
   geom_sf(
     aes(fill = lst_differ),
@@ -195,7 +192,7 @@ map_plot <- ggplot(lsoa_lst) +
     plot.margin = margin(5, 5, 5, 5)
   )
 
-# histogram legend plot - each bar = 0.1°C
+# histogram legend plot - make each bar = 0.1°C
 # colours group into 2°C intervals
 hist_legend <- ggplot(
   st_drop_geometry(lsoa_lst),
@@ -229,15 +226,18 @@ hist_legend <- ggplot(
     limits = lims,
     breaks = seq(-10, 10, by = 4),
     labels = scales::label_number(accuracy = 1)
-  ) +
+  )+
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.05))
+  )+
   labs(
     x = "SUHII (°C)",
-    y = "LSOA count"
+    y = "LSOA Count"
   ) +
-  theme_classic(base_size = 9) +
+  theme_classic(base_size = 10) +
   theme(
-    axis.title = element_text(size = 9),
-    axis.text = element_text(size = 7),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 8),
     plot.background = element_rect(
       fill = "white",
       colour = NA
@@ -272,7 +272,7 @@ suhii_tm
 ```{r}
 # save as png
 ggsave(
-  "figures/Fig7_LSOA_SUHII.png",
+  "figures/Fig9_Spatial_Distribution_SUHII.png",
   plot = suhii_tm,
   width = 11.69,
   height = 8.27,
@@ -564,7 +564,8 @@ pci_breaks <- seq(
   length.out = 5
 )
 
-# Teal palette: low PCI = light teal, high PCI = dark teal
+# Teal palette for plotting
+# low PCI = light teal, high PCI = dark teal
 pci_teals <- c(
   "#B8DDDA",
   "#72C0BB",
@@ -572,7 +573,7 @@ pci_teals <- c(
   "#008F8C"
 )
 
-# Add PCI classes to cooling-effective UGS only
+# Add to cooling-effective UGS only
 cooling_effective_map <- cooling_effective %>%
   mutate(
     PCI_bin = cut(
@@ -581,20 +582,25 @@ cooling_effective_map <- cooling_effective %>%
       include.lowest = TRUE
     )
   )
+```
 
-# ggplot2 map — color = NA means no borders
+```{r}
+# ggplot map
 pci_map_gg <- ggplot() +
   geom_sf(
+    # gla boundary
     data = london_boundary,
     fill = "white",
     color = "grey30",
     linewidth = 0.4
   ) +
+  # all selected ugs 
   geom_sf(
     data = greenspace_pci,
     fill = "#E3E3E3",
     color = NA
   ) +
+  # cooling effective ugs and colour by PCI
   geom_sf(
     data = cooling_effective_map,
     aes(fill = PCI_bin),
@@ -610,14 +616,15 @@ pci_map_gg <- ggplot() +
     panel.background = element_rect(fill = "white", color = NA)
   )
 
-# Histogram legend for PCI values
+# histogram legend for PCI values
 hist_legend_pci <- ggplot(
   st_drop_geometry(cooling_effective),
   aes(x = PCI)
 ) +
   geom_histogram(
     aes(fill = after_stat(x)),
-    bins = 40,
+    binwidth = diff(range(pci_breaks)) / 40,
+    boundary = pci_breaks[1],
     color = NA
   ) +
   geom_vline(
@@ -639,6 +646,9 @@ hist_legend_pci <- ggplot(
     labels = scales::label_number(accuracy = 0.01),
     expand = c(0, 0)
   ) +
+  scale_y_continuous(
+   expand = expansion(mult = c(0, 0.05))
+  ) +
   labs(
     x = "PCI",
     y = "UGS Count"
@@ -652,7 +662,7 @@ hist_legend_pci <- ggplot(
     plot.margin = margin(3, 3, 3, 3)
   )
 
-# Plot together
+# combine plot together
 pci_map <- ggdraw() +
   draw_plot(
     pci_map_gg,
@@ -672,23 +682,10 @@ pci_map <- ggdraw() +
 pci_map
 ```
 
-```{r, eval=FALSE}
-# save as PNG
-ggsave(
-  filename = "figures/Fig4_Cooling_Effective_UGS_PCI_map.png",
-  plot = pci_map,
-  width = 11.69,
-  height = 8.27,
-  units = "in",
-  dpi = 300,
-  bg = "white"
-)
-```
-
 ### 2.4. Save as Shapefile
 
 ```{r, eval=FALSE}
-# create a folder
+# create a folder for the shapefiles
 dir.create("data/cooling_effective_UGS", recursive = TRUE, showWarnings = FALSE)
 
 # Save as shapefile
@@ -705,7 +702,7 @@ Did not remove pixels of water bodies, vegetation that potentially overlap with 
 
 ### 2.6. Visualisation for next Step
 
-\*note this section is for plotting only, the analysis will be in the next markdown file
+\*note this section is for plotting only, the full analysis with attaching access points for routing will be in the next markdown file
 
 ```{r}
 # select UGS function and needed columns
@@ -741,9 +738,10 @@ cooling_effective_filtered_out <- cooling_effective %>%
 ```
 
 ```{r}
-# Exact PCI class boundaries
+# make breaks same as previous map
 pci_breaks <- c(0.00, 0.03, 0.06, 0.09, 0.11)
 
+# labels
 pci_labels <- c(
   "0.00–0.03",
   "0.03–0.06",
@@ -751,6 +749,7 @@ pci_labels <- c(
   "0.09–0.11"
 )
 
+# colours
 pci_teals <- c(
   "0.00–0.03" = "#B8DDDA",
   "0.03–0.06" = "#72C0BB",
@@ -758,7 +757,7 @@ pci_teals <- c(
   "0.09–0.11" = "#008F8C"
 )
 
-# Create plotting variable and PCI classes
+# Create plotting variable and PCI 
 cooling_effective_UGS_clean <- cooling_effective_UGS_clean %>%
   mutate(
     # Keeps any very small values at 0 and values above 0.11
@@ -779,6 +778,7 @@ cooling_effective_UGS_clean <- cooling_effective_UGS_clean %>%
 ```
 
 ```{r}
+# ggplot map
 pci_map_gg_clean <- ggplot() +
   geom_sf(
     data = london_boundary,
@@ -799,7 +799,7 @@ pci_map_gg_clean <- ggplot() +
     color = NA
   ) +
   geom_sf(
-    # the cooling effective ones 
+    # the final cooling effective ugs 
     data = cooling_effective_UGS_clean,
     aes(fill = PCI_bin),
     color = NA
@@ -815,15 +815,11 @@ pci_map_gg_clean <- ggplot() +
   )
 
 
-# Histogram legend — filtered data
+# histogram legend
 hist_legend_pci_clean <- ggplot(
   st_drop_geometry(cooling_effective_UGS_clean), 
   aes(x = PCI)
 ) +
-  #geom_histogram(
-    #aes(fill = after_stat(x)),
-    #bins = 40,
-    #color = NA
   geom_histogram(
     aes(fill = after_stat(x)),
     binwidth = 0.003,
@@ -867,7 +863,7 @@ hist_legend_pci_clean <- ggplot(
     plot.margin = margin(3, 3, 3, 3)
   )
 
-# Combine
+# combine plots together
 pci2_map <- ggdraw() +
   draw_plot(
     pci_map_gg_clean,
@@ -881,11 +877,8 @@ pci2_map <- ggdraw() +
 pci2_map
 ```
 
-Cowplot side by side
-
 ```{r}
-library(cowplot)
-
+# cowplot combine two map objects together in one output 
 combined_pci_maps <- plot_grid(
   pci_map,
   pci2_map,
@@ -900,7 +893,7 @@ combined_pci_maps
 ```{r}
 # save as PNG
 ggsave(
-  filename = "figures/Fig8_Cooling_Effective_UGS_PCI_map.png",
+  filename = "figures/Fig10_Spatial_Distribution_PCI.png",
   plot = combined_pci_maps,
   width = 7.5,
   height = 10,

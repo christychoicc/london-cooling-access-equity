@@ -12,17 +12,13 @@ gc()
 
 ```{r, message=FALSE, warning=FALSE}
 library(sf)
-library(here)
 library(dplyr)
 library(stringr)
-library(tmap)
 library(ggplot2)
 library(grid)
 library(cowplot)
 library(viridis)
-library(purrr)
 library(tidyverse)
-library(tidytransit)
 ```
 
 ## Data Loading
@@ -39,12 +35,14 @@ names(multimodal_accessibility_lsoa)
 ```
 
 ```{r}
+# take minimum time
 pt_dist <- multimodal_accessibility_lsoa %>%
   st_drop_geometry() %>%
   mutate(
     travel_time_min_PT = as.numeric(travel_time_min_PT)
   )
 
+# summarise stats for min travel time
 pt_dist %>%
   summarise(
     n_lsoa = n(),
@@ -65,24 +63,24 @@ pt_dist %>%
 
 <https://ipeagit.github.io/intro_access_book/9_aopdata_acessibilidade.en.html>
 
-## Travel time to the nearest oppportunity (CE UGS)
+## 1. Travel time to the nearest oppportunity (CE UGS)
 
 ```{r}
 # Convert the three travel-time columns from wide to long format
 travel_time_long <- multimodal_accessibility_lsoa %>%
-  select(
+  dplyr::select(
     LSOA21CD,
     travel_time_min_PT,
     travel_time_min_walk,
     travel_time_min_cycle
   ) %>%
-  pivot_longer(
+  tidyr::pivot_longer(
     cols = starts_with("travel_time_min_"),
     names_to = "mode",
     values_to = "travel_time_min"
   ) %>%
-  mutate(
-    mode = recode(
+  dplyr::mutate(
+    mode = dplyr::recode(
       mode,
       "travel_time_min_PT"    = "Public Transit",
       "travel_time_min_walk"  = "Walking",
@@ -98,6 +96,7 @@ travel_time_long <- multimodal_accessibility_lsoa %>%
 ```
 
 ```{r}
+# ggplot map
 min_travel_time <- ggplot(travel_time_long) +
   geom_sf(
     aes(fill = travel_time_min),
@@ -171,7 +170,7 @@ min_travel_time
 ```{r}
 # save as PNG
 ggsave(
-  filename = "figures/Fig10_Minimum_Travel_Time_by_Mode.png",
+  filename = "figures/Fig11_Minimum_Travel_Time.png",
   plot = min_travel_time,
   width = 11.69, 
   height = 5.5,
@@ -181,7 +180,7 @@ ggsave(
 )
 ```
 
-## Cummulative Accessibility
+## 2. Cummulative Accessibility
 
 ```{r}
 access_columns <- c(
@@ -196,15 +195,7 @@ access_columns <- c(
 # Drop geometry so coordinates are not accidentally included
 access_values <- multimodal_accessibility_lsoa %>%
   st_drop_geometry() %>%
-  select(all_of(access_columns))
-
-common_limits <- c(0, 100)
-
-common_breaks <- seq(
-  from = 0,
-  to = 100,
-  by = 25
-)
+  dplyr::select(all_of(access_columns))
 ```
 
 ```{r}
@@ -219,7 +210,9 @@ access_map <- function(data, variable, mode_title, threshold_title) {
     ) +
     scale_fill_viridis_c(
       option = "rocket",
+      # limit to 100 opportunities 
       limits = c(0, 100),
+      # set colour breaks 
       breaks = c(0, 25, 50, 75, 100),
       labels = c("0", "25", "50", "75", "100+"),
       oob = scales::squish,
@@ -257,6 +250,7 @@ access_map <- function(data, variable, mode_title, threshold_title) {
 ```
 
 ```{r}
+# public transit 15 min
 PT_15 <- access_map(
   multimodal_accessibility_lsoa,
   "access_score_15_PT",
@@ -264,6 +258,7 @@ PT_15 <- access_map(
   "Up to 15 minutes"
 )
 
+# public transit 60 min
 PT_60 <- access_map(
   multimodal_accessibility_lsoa,
   "access_score_60_PT",
@@ -271,6 +266,7 @@ PT_60 <- access_map(
   "Up to 60 minutes"
 )
 
+# walking 15 min
 walk_15 <- access_map(
   multimodal_accessibility_lsoa,
   "access_score_15_walk",
@@ -278,6 +274,7 @@ walk_15 <- access_map(
   "Up to 15 minutes"
 )
 
+# walking 15 min
 walk_60 <- access_map(
   multimodal_accessibility_lsoa,
   "access_score_60_walk",
@@ -285,6 +282,7 @@ walk_60 <- access_map(
   "Up to 60 minutes"
 )
 
+# cycling 15 min
 cycle_15 <- access_map(
   multimodal_accessibility_lsoa,
   "access_score_15_cycle",
@@ -292,6 +290,7 @@ cycle_15 <- access_map(
   "Up to 15 minutes"
 )
 
+# cycling 60 min
 cycle_60 <- access_map(
   multimodal_accessibility_lsoa,
   "access_score_60_cycle",
@@ -312,7 +311,7 @@ shared_legend <- cowplot::get_legend(
 ```
 
 ```{r}
-# make no legend for each plot
+# make legend for each plot no legend --> to use a shared legend later
 PT_15_no_legend <- PT_15 + theme(legend.position = "none")
 PT_60_no_legend <- PT_60 + theme(legend.position = "none")
 walk_15_no_legend <- walk_15 + theme(legend.position = "none")
@@ -322,7 +321,7 @@ cycle_60_no_legend <- cycle_60 + theme(legend.position = "none")
 ```
 
 ```{r}
-# combine maps
+# cowplot combine maps
 map_grid <- cowplot::plot_grid(
   PT_15_no_legend,
   PT_60_no_legend,
@@ -336,6 +335,7 @@ map_grid <- cowplot::plot_grid(
   rel_heights = c(1, 1, 1)
 )
 
+# legend
 maps_with_legend <- cowplot::plot_grid(
   map_grid,
   shared_legend,
@@ -359,7 +359,7 @@ access_score_maps
 ```{r}
 # save as PNG
 ggsave(
-  filename = "figures/Fig11_Cummulative_Opportunity_Map.png",
+  filename = "figures/Fig12_Cummulative_Opportunity_Accessibility.png",
   plot = access_score_maps,
   width = 8,
   height = 9,
