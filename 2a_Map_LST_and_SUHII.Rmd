@@ -1,0 +1,274 @@
+---
+title: "2a_Map_LST_and_SUHII"
+---
+
+This markdown contains the code for mapping spatial distribution of LST (Section 1) and SUHII (Section 2).
+
+```{r}
+# remove objects from R environment and clear memory
+rm(list = ls())    
+gc()
+```
+
+## Load Packages
+
+```{r, message=FALSE, warning=FALSE}
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+library(terra)
+library(tidyterra)
+library(scales)
+```
+
+## Data Loading
+
+```{r}
+# greater london boundary 
+london_boundary <- st_read("data/gla/London_GLA_Boundary.shp")
+
+# london lst raster
+london_lst <- rast("data/London_LST_median.tif")
+
+# london lsoa lst and SUHII
+lsoa_lst <- st_read("data/London_LSOA_LST_SUHI/London_LSOA_LST_SUHI.shp")%>% 
+  st_transform(.,27700)
+
+# greenspace >= 2ha
+greenspace2ha <- st_read("data/greenspace_london_2ha/greenspace_london_2ha.shp")
+```
+
+## 1. LST and Green Spaces Polygons
+
+```{r}
+# ensure consistent CRS 
+greenspace2ha <- st_transform(greenspace2ha, crs(london_lst))
+
+# plot lst raster with UGS 
+lst_map <- ggplot() +
+  # lst raster 
+  geom_spatraster(data = london_lst) +
+  # UGS polygons
+  geom_sf(
+    data = greenspace2ha,
+    # create a legend for the UGS polygons 
+    aes(colour = "Selected\nUGS"),
+    fill = NA,
+    linewidth = 0.3,
+    key_glyph = "polygon"
+  ) +
+  # set legend colours for lst raster
+  scale_fill_gradientn(
+    colours = c(
+      "#3F5F8C",
+      "#6F9FC4", 
+      "#BFD9D3",
+      "#F2E8B8",
+      "#E7B46A", 
+      "#C96A4A",
+      "#9E3B32"
+    ),
+    name = "LST (°C)",
+    na.value = "transparent"
+  ) +
+  # set UGS with black borders
+  scale_colour_manual(
+    name = NULL,
+    values = c("Selected\nUGS" = "black")
+  ) +
+  # arrange lst colour legend bar above UGS legend
+  guides(
+    fill = guide_colourbar(order = 1),
+    colour = guide_legend(
+      order = 2,
+      override.aes = list(
+        fill = NA,
+        colour = "black",
+        linewidth = 0.7
+      )
+    )
+  ) +
+  coord_sf(expand = FALSE) +
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "right",
+    legend.text = element_text(size = 10),
+    legend.key.size = unit(0.6, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+lst_map
+```
+
+```{r}
+# save as png
+ggsave(
+  filename = "figures/Fig3_Spatial_Distribution_LST.png",
+  plot = lst_map,
+  width = 11.69,
+  height = 8.27,
+  units = "in",
+  dpi = 300
+)
+```
+
+## 2. SUHII
+
+Note\* SUHII = LST (LSOA) - LST (London)
+
+```{r}
+# Fix geometry
+lsoa_lst <- st_make_valid(lsoa_lst)
+
+# use NYT colours for SUHII 
+diff_cols <- c(
+  "#006D6F",
+  "#268D8B",
+  "#58AAA5",
+  "#91C9C2",
+  "#C8E4DF",
+  "#F4F1E9",
+  "#F5D8CD",
+  "#F2B3A1",
+  "#EA8973",
+  "#DD604C",
+  "#B9362A"
+)
+
+# define SUHII breaks
+# given the data range of -9.98 to 8.53, so use -10 and 10 range
+lims <- c(-10, 10)
+
+# colours group into 2°C intervals
+breaks_seq <- seq(-10, 10, by = 2)
+
+# plot
+map_plot <- ggplot(lsoa_lst) +
+  # SUHII
+  geom_sf(
+    aes(fill = lst_differ),
+    colour = NA,
+    linewidth = 0
+  ) +
+  # apply colour breaks as defined in above
+  scale_fill_stepsn(
+    colours = diff_cols,
+    breaks = breaks_seq,
+    limits = lims,
+    oob = scales::squish,
+    name = "SUHII (°C)"
+  ) +
+  coord_sf(datum = NA) +
+  theme_void() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 14
+    ),
+    plot.margin = margin(5, 5, 5, 5)
+  )
+
+# create a histogram legend and make each bar = 0.1°C
+# colours group into 2°C intervals
+hist_legend <- ggplot(
+  st_drop_geometry(lsoa_lst),
+  aes(x = lst_differ)
+) +
+  # plot SUHII values distribution with 0.1°C bins 
+  geom_histogram(
+    aes(fill = after_stat(x)),
+    binwidth = 0.1,
+    boundary = -10,
+    colour = NA
+  ) +
+  # make a dark grey line at where SUHII = 0 
+  geom_vline(
+    xintercept = 0,
+    linewidth = 0.5,
+    colour = "grey30"
+  ) +
+  # set dashed lines at each 2°C interval colour groups 
+  geom_vline(
+    xintercept = breaks_seq[breaks_seq != 0],
+    linetype = "dashed",
+    linewidth = 0.3,
+    colour = "grey40"
+  ) +
+  # ensure histogram colours consistent with SUHII mapping colours
+  scale_fill_stepsn(
+    colours = diff_cols,
+    breaks = breaks_seq,
+    limits = lims,
+    oob = scales::squish,
+    guide = "none"
+  ) +
+  # histogram x axis
+  scale_x_continuous(
+    limits = lims,
+    breaks = seq(-10, 10, by = 4),
+    labels = scales::label_number(accuracy = 1)
+  )+
+  # histogram y axis 
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.05))
+  )+
+  # histogram x and y axis names
+  labs(
+    x = "SUHII (°C)",
+    y = "LSOA Count"
+  ) +
+  # set histogram font sizes and other settings
+  theme_classic(base_size = 10) +
+  theme(
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 8),
+    plot.background = element_rect(
+      fill = "white",
+      colour = NA
+    ),
+    panel.background = element_rect(
+      fill = "white",
+      colour = NA
+    ),
+    plot.margin = margin(3, 3, 3, 3)
+  )
+
+# put histogram next to map
+suhii_tm <- ggdraw() +
+  draw_plot(
+    map_plot,
+    x = 0,
+    y = 0,
+    width = 0.9,
+    height = 1
+  ) +
+  draw_plot(
+    hist_legend,
+    x = 0.72,
+    y = 0.10,
+    width = 0.25,
+    height = 0.22
+  )
+
+suhii_tm
+```
+
+```{r}
+# save as png
+ggsave(
+  "figures/Fig9_Spatial_Distribution_SUHII.png",
+  plot = suhii_tm,
+  width = 11.69,
+  height = 8.27,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
+```
