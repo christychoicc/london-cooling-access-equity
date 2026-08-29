@@ -13,24 +13,20 @@ gc()
 ```{r, message=FALSE, warning=FALSE}
 library(sf)
 library(dplyr)
-library(stringr)
 library(ggplot2)
 library(grid)
 library(cowplot)
-library(viridis)
-library(tidyverse)
 ```
 
 ## Data Loading
 
-**Multimodal Travel Time (exported from 6_Multimodal_Travel_Time_r5r)**
-
 ```{r}
-# load the saved GeoPackage
+# load multimodal travel time GeoPackage 
 multimodal_accessibility_lsoa <- st_read("data/multimodal_accessibility_lsoa.gpkg")
 ```
 
 ```{r}
+# check column names
 names(multimodal_accessibility_lsoa)
 ```
 
@@ -59,7 +55,7 @@ pt_dist %>%
   )
 ```
 
-## References
+## Mapping Reference
 
 <https://ipeagit.github.io/intro_access_book/9_aopdata_acessibilidade.en.html>
 
@@ -79,6 +75,7 @@ travel_time_long <- multimodal_accessibility_lsoa %>%
     names_to = "mode",
     values_to = "travel_time_min"
   ) %>%
+  # rename for visualisation of each map's title
   dplyr::mutate(
     mode = dplyr::recode(
       mode,
@@ -96,12 +93,14 @@ travel_time_long <- multimodal_accessibility_lsoa %>%
 ```
 
 ```{r}
-# ggplot map
+# plot
 min_travel_time <- ggplot(travel_time_long) +
+  # minimum travel time
   geom_sf(
     aes(fill = travel_time_min),
     colour = NA
   ) +
+  # use continuous colour scale from 0 to 50 minutes
   scale_fill_viridis_c(
     option = "rocket",
     direction = -1,
@@ -109,12 +108,15 @@ min_travel_time <- ggplot(travel_time_long) +
     breaks = seq(0, 50, 10),
     labels = seq(0, 50, 10),
     oob = scales::squish,
+    # missing values as light grey
     na.value = "grey90"
   ) +
+  # plot in one row  
   facet_wrap(
     ~ mode,
     nrow = 1
   ) +
+  # map legend title
   labs(
     fill = "Minimum travel\ntime (minutes)"
   ) +
@@ -132,7 +134,7 @@ min_travel_time <- ggplot(travel_time_long) +
   ) +
   theme_void() +
   theme(
-    # Adds space between titles and maps
+    # add space between titles and maps
     strip.text.x = element_text(
       size = 15,
       margin = margin(
@@ -141,11 +143,11 @@ min_travel_time <- ggplot(travel_time_long) +
       )
     ),
 
-    # Adds space between the three maps
+    # add space between the three maps
     panel.spacing.x = unit(1.2, "cm"),
 
     legend.position = "right",
-
+    
     legend.title = element_text(
       size = 12,
       lineheight = 0.9
@@ -155,7 +157,7 @@ min_travel_time <- ggplot(travel_time_long) +
       size = 10
     ),
 
-    # Adds space around the whole figure
+    # add space around the whole figure
     plot.margin = margin(
       t = 15,
       r = 20,
@@ -183,6 +185,7 @@ ggsave(
 ## 2. Cummulative Accessibility
 
 ```{r}
+# name the six accessibility variables
 access_columns <- c(
   "access_score_15_PT",
   "access_score_60_PT",
@@ -191,17 +194,39 @@ access_columns <- c(
   "access_score_15_cycle",
   "access_score_60_cycle"
 )
+```
 
-# Drop geometry so coordinates are not accidentally included
+```{r}
+# calculate LSOAs with no reachable CE UGS
+
+# drop geometry 
 access_values <- multimodal_accessibility_lsoa %>%
   st_drop_geometry() %>%
   dplyr::select(all_of(access_columns))
+
+zero_access_summary <- access_values %>%
+  tidyr::pivot_longer(
+    cols = everything(),
+    names_to = "access_measure",
+    values_to = "access_score"
+  ) %>%
+  dplyr::group_by(access_measure) %>%
+  dplyr::summarise(
+    n_lsoa = sum(!is.na(access_score)),
+    n_zero = sum(access_score == 0, na.rm = TRUE),
+    percent_zero = (n_zero / n_lsoa) * 100,
+    .groups = "drop"
+  ) %>%
+  dplyr::mutate(
+    percent_zero = round(percent_zero, 2)
+  )
+
+zero_access_summary
 ```
 
 ```{r}
 # plotting function
 access_map <- function(data, variable, mode_title, threshold_title) {
-
   ggplot(data) +
     geom_sf(
       aes(fill = .data[[variable]]),
@@ -250,6 +275,8 @@ access_map <- function(data, variable, mode_title, threshold_title) {
 ```
 
 ```{r}
+# for each mode and time threshold: 
+
 # public transit 15 min
 PT_15 <- access_map(
   multimodal_accessibility_lsoa,
@@ -274,7 +301,7 @@ walk_15 <- access_map(
   "Up to 15 minutes"
 )
 
-# walking 15 min
+# walking 60 min
 walk_60 <- access_map(
   multimodal_accessibility_lsoa,
   "access_score_60_walk",
@@ -311,7 +338,7 @@ shared_legend <- cowplot::get_legend(
 ```
 
 ```{r}
-# make legend for each plot no legend --> to use a shared legend later
+# set legend for each plot as no legend --> to use a shared legend later
 PT_15_no_legend <- PT_15 + theme(legend.position = "none")
 PT_60_no_legend <- PT_60 + theme(legend.position = "none")
 walk_15_no_legend <- walk_15 + theme(legend.position = "none")
@@ -321,7 +348,7 @@ cycle_60_no_legend <- cycle_60 + theme(legend.position = "none")
 ```
 
 ```{r}
-# cowplot combine maps
+# cowplot combine maps 3 rows 2 columns plot
 map_grid <- cowplot::plot_grid(
   PT_15_no_legend,
   PT_60_no_legend,
@@ -359,7 +386,7 @@ access_score_maps
 ```{r}
 # save as PNG
 ggsave(
-  filename = "figures/Fig12_Cummulative_Opportunity_Accessibility.png",
+  filename = "figures/Fig12_Cumulative_Opportunity_Accessibility.png",
   plot = access_score_maps,
   width = 8,
   height = 9,

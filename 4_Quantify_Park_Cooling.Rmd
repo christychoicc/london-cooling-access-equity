@@ -323,7 +323,7 @@ st_write(
 
 Did not remove pixels of water bodies, vegetation that potentially overlap with the buffer rings.
 
-### PCI Visualisation 
+### PCI Visualisation
 
 **Map 1: Cooling Effective UGS by PCI**
 
@@ -535,7 +535,7 @@ pci_teals <- c(
 cooling_effective_UGS_final <- cooling_effective_UGS_final %>%
   mutate(
     PCI_bin = cut(
-      PCI_plot,
+      PCI,
       breaks = pci_breaks,
       labels = pci_labels,
       include.lowest = TRUE,
