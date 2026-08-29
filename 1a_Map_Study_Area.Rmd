@@ -1,6 +1,10 @@
 ---
-title: "Map_Study_Area"
+title: "1a_Map_Study_Area"
 ---
+
+This markdown contains the code for mapping the study area figure presented in the dissertation.
+
+## Load Packages
 
 ```{r}
 library(sf)
@@ -13,20 +17,14 @@ library(cowplot)
 ```{r}
 # london boundaries 
 london_boundary <- st_read("data/gla/London_GLA_Boundary.shp")
-```
 
-```{r}
 # london LSOA boundaries
 london_lsoa <- st_read("data/lsoa_london/lsoa_london.shp")
-```
 
-```{r}
 # UK boundaries
 uk_boundary <- st_read("data/raw_data/gadm41_GBR_0.json")%>%
   st_transform(.,27700)
-```
 
-```{r}
 # greenspaces > 2ha
 greenspace2ha <- st_read("data/greenspace_london_2ha/greenspace_london_2ha.shp")
 ```
@@ -50,17 +48,13 @@ uk_london_map <- ggplot() +
     colour = "grey30",
     linewidth = 0.5
   ) +
-  coord_sf(
-    datum = NA,
-    expand = FALSE
-  ) +
   theme_void()
 
 uk_london_map
 ```
 
 ```{r}
-# study area london and ugs distribution map
+# study area london and UGS distribution map
 london_lsoa_study_area_map <- ggplot() +
   geom_sf(
     # london lsoa
@@ -81,10 +75,6 @@ london_lsoa_study_area_map <- ggplot() +
     data = greenspace2ha,
     fill = "#A8C3A0",   # muted green
     colour = NA
-  ) +
-  coord_sf(
-    datum = NA,
-    expand = FALSE
   ) +
   theme_void()
 

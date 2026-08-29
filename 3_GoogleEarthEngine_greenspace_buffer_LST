@@ -12,7 +12,7 @@ Map.centerObject(london_point, 10)
 
 
 //------------------------- Load vector data -----------------------------
-// the greenspace shp is removed any park size < 2ha 
+// the greenspace shp is removed any greenspace size < 2ha 
 var greenspace_raw = ee.FeatureCollection("users/christychoicc/greenspace_london_2ha");
 
 
@@ -113,7 +113,7 @@ Map.addLayer(l9lst_median_2025_clipped, lst_vis, 'Summer median LST 2025');
 // --------------------- Green Space and Buffer LST ----------------------
 
 // define buffer ring distances
-// 30m each, maximum buffer distance of 900m
+// 30m each, from 30m to maximum buffer distance of 900m
 var ring_distances = ee.List.sequence(30, 900, 30);
 
 // define function for calculating greenspace and buffer LST
@@ -121,7 +121,7 @@ var greenspace_and_buffer = function(feature) {
 
   var greenspace_geom = feature.geometry().buffer(0, 1);
 
-  // park mean LST
+  // calculate greenspace mean LST
   var greenspace_stats = l9lst_median_2025.reduceRegion({
     reducer:   ee.Reducer.mean(),
     geometry:  greenspace_geom,
@@ -130,16 +130,17 @@ var greenspace_and_buffer = function(feature) {
     tileScale: 4
   });
 
-  // park LST values
-  var park_lst_value = ee.Algorithms.If(
+  // greenspace LST values
+  var greenspace_lst_value = ee.Algorithms.If(
     greenspace_stats.contains('ST_B10'),
     greenspace_stats.get('ST_B10'),
     // if no value, impute as -9999
     ee.Number(-9999)
   );
 
-  // create new column for park LST
-  var feature_with_park_lst = feature.set('park_lst', park_lst_value);
+  // create new column for greenspace (park) LST
+  // export name as park_lst (equivalent to greenspace lst) as GEE export cuts name shorter
+  var feature_with_greenspace_lst = feature.set('park_lst', greenspace_lst_value);
 
   // buffer LST values
   var ring_dict = ee.Dictionary(
@@ -191,7 +192,7 @@ var greenspace_and_buffer = function(feature) {
     }, ee.Dictionary({}))
   );
 
-  return feature_with_park_lst.set(ring_dict);
+  return feature_with_greenspace_lst.set(ring_dict);
 };
 
 // Apply to all greenspaces polygons
@@ -200,8 +201,8 @@ var greenspace_buffer_lst = greenspace.map(greenspace_and_buffer);
 
 
 // ---------------------------- Export data -------------------------------
-// Export park shapefile with all ring columns
-// One row per park, columns: park_lst, ring_30, ring_60 ... ring_900
+// Export greenspace (park) shapefile with all ring columns
+// One row per greenspace (park), columns: park_lst, ring_30, ring_60 ... ring_900
 Export.table.toDrive({
   collection:  greenspace_buffer_lst,
   description: 'greenspace_buffer_LST',

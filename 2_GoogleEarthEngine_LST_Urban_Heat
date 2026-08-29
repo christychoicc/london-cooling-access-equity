@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------
 //      Land Surface Temperature Export for London and London LSOAs 
-//                         and UHI Intensity
+//                         and SUHI Intensity
 //------------------------------------------------------------------------
 
 
@@ -189,7 +189,7 @@ Export.image.toDrive({
 // 3. Calculate difference from London mean LST per LSOA 
 // 4. Export data
 
-// Calculate one mean LST value for London
+// Calculate one mean LST value for whole of London
 var london_mean_lst_dict = l9lst2025_median_gla.reduceRegion({
   reducer: ee.Reducer.mean(),
   geometry: london_gla_boundary.geometry(),
@@ -203,7 +203,7 @@ var london_mean_lst = ee.Number(london_mean_lst_dict.get('ST_B10'));
 print('London mean LST 2025:')
 print(london_mean_lst);
 
-// Calculate Statistics per spatial unit (mean LST for each LSOA)
+// Calculate Statistics per spatial unit (calculate mean LST for each LSOA)
 var mean_LST_LSOA = l9lst2025_median_lsoa.reduceRegions({
   collection: lsoa_london_boundary,
   reducer: ee.Reducer.mean(),
@@ -211,6 +211,7 @@ var mean_LST_LSOA = l9lst2025_median_lsoa.reduceRegions({
 });
 
 // Add a new column for calculated difference from London mean LST for each LSOA
+// LST difference refers to SUHII 
 var mean_LST_LSOA_with_difference = mean_LST_LSOA.map(function(feature) {
   var lsoa_mean_lst = ee.Number(feature.get('mean'));
   var lst_difference = lsoa_mean_lst.subtract(london_mean_lst);
