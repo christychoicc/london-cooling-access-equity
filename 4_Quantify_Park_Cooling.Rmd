@@ -14,52 +14,32 @@ gc()
 
 ```{r, message=FALSE, warning=FALSE}
 library(sf)
-library(here)
 library(dplyr)
 library(ggplot2)
-library(tidyverse)
-library(tidyr)
-library(terra)
-library(tidyterra)
-library(viridis)
 library(tmap)
 library(cowplot)
+library(terra)
+library(tidyterra)
 library(scales)
-library(RColorBrewer)
-library(ggtext)
-library(showtext)
 ```
 
 ## Data Loading
 
-**Greater London Boundary:**
-
 ```{r}
+# greater london boundary 
 london_boundary <- st_read("data/gla/London_GLA_Boundary.shp")
-```
 
-**London LST Raster:**
-
-```{r}
+# london lst raster
 london_lst <- rast("data/London_LST_median.tif")
-```
 
-**London LSOA LST and SUHII:**
-
-```{r}
+# london lsoa lst and SUHII
 lsoa_lst <- st_read("data/London_LSOA_LST_SUHI/London_LSOA_LST_SUHI.shp")%>% 
   st_transform(.,27700)
-```
 
-**Green Space \> 2ha:**
-
-```{r}
+# greenspace >= 2ha
 greenspace2ha <- st_read("data/greenspace_london_2ha/greenspace_london_2ha.shp")
-```
 
-**Green Space and Green Space Buffer LST:**
-
-```{r}
+# greenspace and greenspace buffer lst
 greenspace <- st_read("data/greenspace_buffer_lst/greenspace_buffer_lst.shp") %>% 
   st_transform(.,27700)
 ```
@@ -69,36 +49,42 @@ greenspace <- st_read("data/greenspace_buffer_lst/greenspace_buffer_lst.shp") %>
 **Map: Mean LST and Green Spaces Polygons**
 
 ```{r}
-# Ensure consistent CRS 
+# ensure consistent CRS 
 greenspace2ha <- st_transform(greenspace2ha, crs(london_lst))
 
-# plot
+# plot lst raster with UGS 
 lst_map <- ggplot() +
+  # lst raster 
   geom_spatraster(data = london_lst) +
+  # UGS polygons
   geom_sf(
     data = greenspace2ha,
+    # create a legend for the UGS polygons 
     aes(colour = "Selected\nUGS"),
     fill = NA,
     linewidth = 0.3,
     key_glyph = "polygon"
   ) +
+  # set legend colours for lst raster
   scale_fill_gradientn(
     colours = c(
-      "#3F5F8C",  # muted deep blue
-      "#6F9FC4",  # soft blue
-      "#BFD9D3",  # pale blue-green
-      "#F2E8B8",  # pale yellow
-      "#E7B46A",  # muted orange
-      "#C96A4A",  # muted red-orange
-      "#9E3B32"   # deep muted red
+      "#3F5F8C",
+      "#6F9FC4", 
+      "#BFD9D3",
+      "#F2E8B8",
+      "#E7B46A", 
+      "#C96A4A",
+      "#9E3B32"
     ),
     name = "LST (°C)",
     na.value = "transparent"
   ) +
+  # set UGS with black borders
   scale_colour_manual(
     name = NULL,
     values = c("Selected\nUGS" = "black")
   ) +
+  # arrange lst colour legend bar above UGS legend
   guides(
     fill = guide_colourbar(order = 1),
     colour = guide_legend(
@@ -144,7 +130,7 @@ ggsave(
 # Fix geometry
 lsoa_lst <- st_make_valid(lsoa_lst)
 
-# use NYT colours for UHI 
+# use NYT colours for SUHII 
 diff_cols <- c(
   "#006D6F",
   "#268D8B",
@@ -160,19 +146,21 @@ diff_cols <- c(
 )
 
 # define SUHII breaks
-# data range: -9.98 to 8.53 so use -10 and 10 range
+# given the data range of -9.98 to 8.53, so use -10 and 10 range
 lims <- c(-10, 10)
 
 # colours group into 2°C intervals
 breaks_seq <- seq(-10, 10, by = 2)
 
-# ggplot map
+# plot
 map_plot <- ggplot(lsoa_lst) +
+  # SUHII
   geom_sf(
     aes(fill = lst_differ),
     colour = NA,
     linewidth = 0
   ) +
+  # apply colour breaks as defined in above
   scale_fill_stepsn(
     colours = diff_cols,
     breaks = breaks_seq,
@@ -192,29 +180,33 @@ map_plot <- ggplot(lsoa_lst) +
     plot.margin = margin(5, 5, 5, 5)
   )
 
-# histogram legend plot - make each bar = 0.1°C
+# create a histogram legend and make each bar = 0.1°C
 # colours group into 2°C intervals
 hist_legend <- ggplot(
   st_drop_geometry(lsoa_lst),
   aes(x = lst_differ)
 ) +
+  # plot SUHII values distribution with 0.1°C bins 
   geom_histogram(
     aes(fill = after_stat(x)),
     binwidth = 0.1,
     boundary = -10,
     colour = NA
   ) +
+  # make a dark grey line at where SUHII = 0 
   geom_vline(
     xintercept = 0,
     linewidth = 0.5,
     colour = "grey30"
   ) +
+  # make lines at each 2°C interval colour groups 
   geom_vline(
     xintercept = breaks_seq[breaks_seq != 0],
     linetype = "dashed",
     linewidth = 0.3,
     colour = "grey40"
   ) +
+  # ensure histogram colours consistent with SUHII mapping colours
   scale_fill_stepsn(
     colours = diff_cols,
     breaks = breaks_seq,
@@ -222,18 +214,22 @@ hist_legend <- ggplot(
     oob = scales::squish,
     guide = "none"
   ) +
+  # histogram x axis
   scale_x_continuous(
     limits = lims,
     breaks = seq(-10, 10, by = 4),
     labels = scales::label_number(accuracy = 1)
   )+
+  # histogram y axis 
   scale_y_continuous(
     expand = expansion(mult = c(0, 0.05))
   )+
+  # histogram x and y axis names
   labs(
     x = "SUHII (°C)",
     y = "LSOA Count"
   ) +
+  # histogram font sizes and other settings
   theme_classic(base_size = 10) +
   theme(
     axis.title = element_text(size = 10),
@@ -298,13 +294,20 @@ greenspace_clean <- greenspace %>%
          # all of the 20 buffer rings in ascending order
          all_of(paste0("ring_", seq(30, 900, 30))),
          geometry)
-```
 
-```{r}
 # check any NA values
 greenspace_clean %>%
   st_drop_geometry() %>%
-  summarise(across(everything(), ~sum(is.na(.))))
+  select(park_lst, 
+         # take all of the buffer ring mean lst
+         all_of(paste0("ring_", seq(30, 900, 30)))) %>%
+  summarise(
+    across(
+      everything(),
+      # -9999 was previously imputed in GEE scripts representing no values 
+      ~ sum(. == -9999, na.rm = TRUE)
+    )
+  )
 ```
 
 ### 2.2. Cubic Polynomial Curve and Park Cooling Intensity (PCI)
@@ -332,7 +335,7 @@ greenspace_clean %>%
 +-----------------------------+--------------------------------------------------------------+-----------------------------------------------------------------------------------------+
 
 ```{r}
-# Ring distances in metres — x values for polynomial fitting
+# buffer ring from 30m to 900m each 30m intervals as x values for polynomial fitting
 x_vals <- seq(30, 900, 30)
 ring_cols <- paste0("ring_", seq(30, 900, 30))
 
@@ -343,24 +346,26 @@ results <- list()
 for (i in 1:nrow(greenspace_clean)) {
   # for each greenspace
   park <- greenspace_clean[i, ]
-  # mean LST values of buffer ring 
+  # take mean LST values of buffer ring 
   y_ring_lst <- as.numeric(unlist(park[, ring_cols] %>% st_drop_geometry(), use.names = FALSE))
-  # park LST values
+  # take park LST values
   park_lst <- as.numeric(park$park_lst)
   
+
   # fit a cubic polynomial curve through the LST values:
   # T(x) = ax3 + bx2 + cx + d
   poly_curve <- lm(y_ring_lst ~ poly(x_vals, degree = 3, raw = TRUE))
   
-  # extract coefficients
+  # extract polynomial coefficients
   coefs <- coef(poly_curve)
   d <- coefs[1]
   c <- coefs[2]
   b <- coefs[3]
   a <- coefs[4]
   
-  # calculate R squared of the fitted curve to check how well it fits 
-  # it is said there is found less error with higher r2 (https://www.nature.com/articles/s41599-023-02209-5)
+  # calculate R2 of the fitted curve to check how well it fits 
+  # higher R2 should find less error 
+  # https://www.nature.com/articles/s41599-023-02209-5
   r2 <- summary(poly_curve)$r.squared
   
   
@@ -382,7 +387,7 @@ for (i in 1:nrow(greenspace_clean)) {
   # use discriminant of the derivative equation to find x: 
   disc <- B^2 - 4 * A * C
   
-  # parks with no valid turning point, return as NA
+  # parks with no turning point found, return as NA
   if (is.na(disc) || disc < 0) {
     L <- NA
     TL <- NA
@@ -392,11 +397,11 @@ for (i in 1:nrow(greenspace_clean)) {
     max_lst_diff <- NA
   } else {
    
-    # find possible turning points
+    # find 2 possible turning points
     root1 <- (-B + sqrt(disc)) / (2 * A)
     root2 <- (-B - sqrt(disc)) / (2 * A)
     
-    # only keep turning points within the ring range 30 - 900m
+    # only keep turning points within the range 30 - 900m
     valid_roots <- c(root1, root2)
     valid_roots <- valid_roots[valid_roots >= 30 & valid_roots <= 900]
     
@@ -409,13 +414,13 @@ for (i in 1:nrow(greenspace_clean)) {
       max_lst_diff <- NA
     } else {
       
-      # to identify whether turning point is at peak of curve or valley
+      # to identify whether turning point is a local maximum or minimum
       # use second derivative: T''(x) = 6ax + 2b
       second_derivative <- 6 * a * valid_roots + 2 * b
       
-      # keep only peak (<0 is peak)
+      # keep only peak of local maximum
       peak_roots <- valid_roots[second_derivative < 0]
-      # if it s not a peak, return as NA
+      # if not a peak, return as NA
       if (length(peak_roots) == 0) {
         L <- NA
         TL <- NA
@@ -426,21 +431,21 @@ for (i in 1:nrow(greenspace_clean)) {
       } else {
         
         # using the initial turning point (first peak) calculate cooling distance
-        # L = estimated cooling distance
+        # L = estimated maximum cooling distance
         L <- min(peak_roots)
         
-        # calculate fitted LST at the L
+        # calculate fitted LST at L
         # TL = fitted LST at the max cooling distance (L)
         TL <- a * L^3 + b * L^2 + c * L + d
         
-        # calculate actual_accumulated_lst from 0 to L
-        actual_accumulated_lst <- (a/4 * L^4) +
+        # calculate fitted_lst_integral from 0 to L
+        fitted_lst_integral <- (a/4 * L^4) +
           (b/3 * L^3) + 
           (c/2 * L^2) + 
           (d   * L)
         
         # calculate accumulated PCI
-        accumulated_cooling <- (L * TL) - actual_accumulated_lst
+        accumulated_cooling <- (L * TL) - fitted_lst_integral
         
         # PCI
         PCI <- accumulated_cooling / (L * TL)
@@ -541,6 +546,26 @@ cooling_effective %>%
     median_L = median(L, na.rm = TRUE)
   )
 ```
+
+### 2.4. Save as Shapefile
+
+```{r, eval=FALSE}
+# create a folder for the shapefiles
+dir.create("data/cooling_effective_UGS", recursive = TRUE, showWarnings = FALSE)
+
+# Save as shapefile
+st_write(
+  cooling_effective,
+  "data/cooling_effective_UGS/cooling_effective_UGS.shp",
+  delete_dsn = TRUE
+)
+```
+
+### 2.5. Limitations
+
+Did not remove pixels of water bodies, vegetation that potentially overlap with the buffer rings.
+
+### 2.6. PCI Visualisation 
 
 **Map: Cooling Effective UGS by PCI**
 
@@ -682,27 +707,7 @@ pci_map <- ggdraw() +
 pci_map
 ```
 
-### 2.4. Save as Shapefile
-
-```{r, eval=FALSE}
-# create a folder for the shapefiles
-dir.create("data/cooling_effective_UGS", recursive = TRUE, showWarnings = FALSE)
-
-# Save as shapefile
-st_write(
-  cooling_effective,
-  "data/cooling_effective_UGS/cooling_effective_UGS.shp",
-  delete_dsn = TRUE
-)
-```
-
-### 2.5. Limitations
-
-Did not remove pixels of water bodies, vegetation that potentially overlap with the buffer rings.
-
-### 2.6. Visualisation for next Step
-
-\*note this section is for plotting only, the full analysis with attaching access points for routing will be in the next markdown file
+**Map cooling-effective UGS by PCI filtered for public park or garden and playing field**:
 
 ```{r}
 # select UGS function and needed columns
@@ -778,7 +783,7 @@ cooling_effective_UGS_clean <- cooling_effective_UGS_clean %>%
 ```
 
 ```{r}
-# ggplot map
+# plot 
 pci_map_gg_clean <- ggplot() +
   geom_sf(
     data = london_boundary,
