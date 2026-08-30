@@ -24,55 +24,36 @@ library(gtfstools)
 
 ## Data Loading
 
-**Greater London Boundary**
-
 ```{r}
+# greater london boundary
 london_boundary <- st_read("data/gla/London_GLA_Boundary.shp")
-```
 
-**London LSOA Boundaries**
-
-```{r}
+# london LSOA boundaries
 london_lsoa <- st_read("data/lsoa_london/lsoa_london.shp")
-```
 
-**Green spaces \> 2ha**
-
-```{r}
+# greenspaces > 2ha
 greenspace2ha <- st_read("data/greenspace_london_2ha/greenspace_london_2ha.shp")
 
-```
-
-```{r}
-nrow(greenspace2ha)
-```
-
-**Cooling Effective UGS shp** (exported from 4_Quantify_Urban_Heat_Park_Cooling.Rmd)\_
-
-```{r}
-# Load cooling-effective greenspace shapefile
+# cooling-effective greenspace shapefile
+# exported from 4_Quantify_Urban_Heat_Park_Cooling.Rmd
 cooling_effective_UGS <- st_read("data/cooling_effective_UGS/cooling_effective_UGS.shp") %>%
   st_transform(.,27700)
-```
 
-**OS Open Greenspace Access Points**
-
-```{r}
+# OS open greenspace access points
 greenspace_access_points <- st_read("data/raw_data/OS-Open-Greenspace-GB/GB_AccessPoint/GB_AccessPoint.shp") 
-```
 
-**London LSOA Population Weighted Centroids**
-
-```{r}
+# london lsoa population weighted centroids
 london_lsoa_pop_weighted_centroids <- st_read("data/london_lsoa_pop_weighted_centroids/london_lsoa_pop_weighted_centroids.shp")
 ```
 
 ## 1. Origins
 
-**London LSOA population weighted centroids**
+The loaded data `london_lsoa_pop_weighted_centroids` contains the origns to be used in r5r routing.
 
-```{r, eval=FALSE}
-# map with legend
+**Map 1. London LSOA population weighted centroids**
+
+```{r}
+# plot
 london_centroids_map <- ggplot() +
   geom_sf(
     data = london_lsoa,
@@ -131,7 +112,7 @@ names(cooling_effective_UGS)
 ### 2.1. Filter Function of Cooling Effective UGS
 
 +----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Literature Support               | Reason                                                                                                                                                                                                                                         |
+| Support                          | Reason                                                                                                                                                                                                                                         |
 +==================================+================================================================================================================================================================================================================================================+
 | Green Infrastructure Framework a | 1.2 Accessible Green Infrastructure (AGI) defined accessible greenspace used in Version 2.2 of the Green Infrastructure Mapping: <https://designatedsites.naturalengland.org.uk/GreenInfrastructure/UserGuide/GreenInfrastructureModules.aspx> |
 +----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -176,13 +157,13 @@ unique(cooling_effective_UGS_clean$functn_)
 ### 2.2. Join Filtered Cooling Effective UGS with Access Points
 
 ```{r}
-# check
+# check before joining
 nrow(greenspace_access_points)
 names(greenspace_access_points)
 ```
 
 ```{r}
-# join 
+# join by greenspace site ID
 cooling_effective_access_points <- greenspace_access_points %>%
   inner_join(
     cooling_effective_UGS_clean %>%
@@ -193,45 +174,48 @@ cooling_effective_access_points <- greenspace_access_points %>%
 ```
 
 ```{r}
-# check
-# number of access points
+# check number of access points
 nrow(cooling_effective_access_points)
 ```
 
-**Map: Cooling Effective Greenspace Access Points**
+**Map 2: Cooling Effective Greenspace Access Points**
 
 ```{r}
-# map with legend
 # ensure consist CRS
 london_boundary <- st_transform(london_boundary, st_crs(cooling_effective_UGS_clean))
 greenspace2ha <- st_transform(greenspace2ha, st_crs(cooling_effective_UGS_clean))
 cooling_effective_access_points <- st_transform(cooling_effective_access_points, st_crs(cooling_effective_UGS_clean))
 
 access_point_map <- ggplot() +
+  # greater london boundary
   geom_sf(
     data = london_boundary,
     fill = "white",
     colour = "grey30"
   ) +
+  # greenspaces >= 2ha layer as light grey
   geom_sf(
     data = greenspace2ha,
     fill = "grey85",
     colour = NA
   ) +
+  # cooling effective UGS layer
   geom_sf(
     data = cooling_effective_UGS_clean,
-    fill = "#B8DDDA",   # light teal
+    fill = "#B8DDDA", # light teal used in PCI maps
     colour = NA
   ) +
+  # plot on top the access points of all cooling effective UGS
   geom_sf(
     data = cooling_effective_access_points,
     aes(fill = "Access Points"),
-    shape = 25,              # upside-down triangle
+    shape = 25,  # upside-down triangle
     colour = "black",
     stroke = 0.15,
     size = 0.8,
     alpha = 0.9
   ) +
+  # set colour for access points 
   scale_fill_manual(
     values = c("Access Points" = "#008F8C"),   # dark teal
     name = NULL
@@ -273,12 +257,18 @@ names(london_lsoa_pop_weighted_centroids)
 names(cooling_effective_access_points)
 ```
 
+r5r routing requires lon lat coordinates, so first step is to transform them:
+
 ```{r}
+#origins
+# transform to EPSG 4326
 origins_sf <- london_lsoa_pop_weighted_centroids %>%
   st_transform(4326)
 
+# extract lon and lat coordinates from origins
 origins_coords <- st_coordinates(origins_sf)
 
+# create an origins df  
 origins <- origins_sf %>%
   st_drop_geometry() %>%
   transmute(
@@ -287,11 +277,16 @@ origins <- origins_sf %>%
     lat = origins_coords[, 2]
   )
 
+
+# destinations
+# transform to EPSG 4326
 destinations_sf <- cooling_effective_access_points %>%
   st_transform(4326)
 
+# extract lon and lat coordinates from destinations
 destinations_coords <- st_coordinates(destinations_sf)
 
+# create an destinations df
 destinations <- destinations_sf %>%
   st_drop_geometry() %>%
   transmute(
@@ -302,20 +297,22 @@ destinations <- destinations_sf %>%
 ```
 
 ```{r}
+# check 
 names(origins)
 names(destinations)
 
 head(origins)
 head(destinations)
 
-# These should both return TRUE
+# check if they all return TRUE 
 all(c("id", "lon", "lat") %in% names(origins))
 all(c("id", "lon", "lat") %in% names(destinations))
 ```
 
-Save origins and destinations objects as RDS
+**Save origins and destinations objects as RDS**
 
-```{r, eval=FALSE}
+```{r}
+# save as RDS 
 saveRDS(origins, "data/origins_destinations/origins.rds")
 saveRDS(destinations, "data/origins_destinations/destinations.rds")
 ```
@@ -353,13 +350,13 @@ ggsave(
 )
 ```
 
-## 4. Visualise Road Network
+## 4. r5r
 
-## 5. r5r
+### 4.1. GTFS Data Checks
 
-### 5.1. GTFS Data Checks
+```{r}
+# Load GTFS Data
 
-```{r, eval=FALSE}
 # GTFS Bus Data
 gtfs_bus <- read_gtfs("data/r5r/itm_london_gtfs.zip")
 
@@ -367,33 +364,33 @@ gtfs_bus <- read_gtfs("data/r5r/itm_london_gtfs.zip")
 gtfs_rail <- read_gtfs("data/r5r/gtfs_rail.zip")
 ```
 
-**Check Bus Open Data Service GTFS**
+```{r}
+# check Bus GTFS Data
 
-```{r, eval=FALSE}
-# Route types
+# route types
 # 3 = bus, 1 = subway/tube, 2 = rail, 0 = tram
 table(gtfs_bus$routes$route_type)
 
-# Service providers (agency)
+# service providers (agency)
 unique(gtfs_bus$agency$agency_name)
 ```
 
-**Check rail GTFS**
+```{r}
+# check Rail GTFS Data
 
-```{r, eval=FALSE}
-# Check all agencies (providers)
+# check all rail agencies/ providers
 unique(gtfs_rail$agency$agency_name)
 ```
 
-Check what TfL Rail Includes
-
-```{r, eval=FALSE}
+```{r}
+# within Rail GTFS
+# check specifically what TfL Rail includes
 gtfs_rail$routes %>%
   left_join(gtfs_rail$agency, by = "agency_id") %>%
   filter(grepl("TfL Rail", agency_name)) %>%
   select(route_short_name, route_long_name, route_type)
 
-# check lizzy line stops 
+# check Elizabeth Line stops 
 gtfs_rail$stops %>%
   filter(grepl("Abbey Wood|Shenfield|Paddington|Liverpool Street|Whitechapel|Canary Wharf|Custom House|Woolwich", stop_name, ignore.case = TRUE)) %>%
   select(stop_name, stop_id) %>%
@@ -407,10 +404,8 @@ gtfs_rail$trips %>%
   nrow()
 ```
 
-**Check GTFS date ranges**
-
-```{r, eval=FALSE}
-# Check date ranges
+```{r}
+# Check date ranges for both bus and rail GTFS
 cat("Bus GTFS\n")
 cat("Start date:", as.character(min(gtfs_bus$calendar$start_date)), "\n")
 cat("End date:  ", as.character(max(gtfs_bus$calendar$end_date)), "\n")
@@ -420,30 +415,24 @@ cat("Start date:", as.character(min(gtfs_rail$calendar$start_date)), "\n")
 cat("End date:  ", as.character(max(gtfs_rail$calendar$end_date)), "\n")
 ```
 
-### 5.2. Build r5r network
+### 4.2. Build r5r network
 
-#### 5.2.1. r5r network setup
+#### 4.2.1. Setup
 
-```{r, eval=FALSE}
-#install.packages('rJavaEnv')
+```{r}
+install.packages('rJavaEnv')
+library(rJavaEnv)
 
-# check version of Java currently installed (if any) 
-#rJavaEnv::java_check_version_rjava()
+# check version of Java currently installed
+rJavaEnv::java_check_version_rjava()
 
 # install Java 21
-#rJavaEnv::java_quick_install(version = 21)
-```
-
-**Check Java Environment**
-
-```{r, eval=FALSE}
-library(rJavaEnv)
-rJavaEnv::java_check_version_rjava()
+rJavaEnv::java_quick_install(version = 21)
 ```
 
 **Read in Origins and Destinations again:**
 
-```{r, eval=FALSE}
+```{r}
 origins1 <- readRDS("data/origins_destinations/origins.rds")
 destinations1 <- readRDS("data/origins_destinations/destinations.rds")
 ```
@@ -454,9 +443,9 @@ nrow(origins1)
 nrow(destinations1)
 ```
 
-#### 5.2.2. r5r network
+#### 4.2.2. Build r5r network
 
-(this part can be skipped after creating the r5r network folder once)
+Note\* this section can be skipped once r5r network has been built, using the built network only requires loading the r5r folder within data directory. This section's code chunks are all labelled for `eval=FALSE`.
 
 ```{r, eval=FALSE}
 # check package version
@@ -467,56 +456,48 @@ packageVersion("r5r")
 # increase Java memory
 options(java.parameters = "-Xmx12G")
 
-# load libraries
+# load r5r library - load after loading rJavaEnv
 library(r5r)
 
 #path <- system.file("r5r_path", package = "r5r")
 r5r_core <- r5r::build_network(data_path = "data/r5r")
-
-# used setup_r5() previously and got the following: 
-# Warning: ! `setup_r5()` is being deprecated in *r5r* v2.3.0 and will be removed in a future release. ℹ Please use `r5r::build_network()` instead.
 ```
 
 ```{r, eval=FALSE}
-# Error message: 
-
-#Error in `r5r::build_network()`:
-#✖ High priority GTFS errors found; network build failed.
-#ℹ Use `r5r::get_gtfs_errors()` to see them, or review data/r5r/gtfs_errors.csv.
-#Run `rlang::last_trace()` to see where the error occurred.
-```
-
-```{r, eval=FALSE}
-# check what the error is 
+# high priority GTFS errors found
+# https://ipeagit.github.io/r5r/reference/get_gtfs_errors.html 
+# check the error from building network
 r5r::get_gtfs_errors(data_path)
-
 head(r5r::get_gtfs_errors(data_path), 20)
 ```
 
 ```{r, eval=FALSE}
 # check which GTFS errored
-# create a fixed gtfs rail zip --> named : gtfs_rail_fixed
-feeds <- c("data/r5r/gtfs_rail.zip", "data/r5r/itm_london_gtfs.zip")  
+feeds <- c("data/r5r/gtfs_rail.zip", 
+           "data/r5r/itm_london_gtfs.zip")  
 
+# check for each GTFS feed
 for (f in feeds) {
+  # read GTFS 
   gtfs <- read_gtfs(f)
-
+  # skip to next if there is no transfers.txt
   if (is.null(gtfs$transfers)) {
     message(basename(f), ": no transfers.txt, nothing to fix")
     next
   }
-
+  # check for valid stops id within stops.txt
   valid_stops <- gtfs$stops$stop_id
-  bad <- gtfs$transfers[
+  # check for invalid transfers in from or to stop id 
+  invalid_transfers <- gtfs$transfers[
     !(from_stop_id %in% valid_stops) | !(to_stop_id %in% valid_stops)
   ]
-  message(basename(f), ": ", nrow(bad), " broken transfer rows")
-
-  if (nrow(bad) > 0) {
+  message(basename(f), ": ", nrow(invalid_transfers), " broken transfer rows")
+  # keep only transfers when both from and to stop id exists
+  if (nrow(invalid_transfers) > 0) {
     gtfs$transfers <- gtfs$transfers[
       from_stop_id %in% valid_stops & to_stop_id %in% valid_stops
     ]
-    #rewrite a removed error new zip file
+    # rewrite this revised version as new zip file
     fixed_name <- sub("\\.zip$", "_fixed.zip", f)
     write_gtfs(gtfs, fixed_name)
     message("  wrote ", basename(fixed_name))
@@ -526,27 +507,21 @@ for (f in feeds) {
 
 ```{r, eval=FALSE}
 # move the old zip out of r5r folder
-file.rename("data/r5r/gtfs_rail.zip", "data/raw_data/r5r_raw/gtfs_rail.zip")
+file.rename("data/r5r/gtfs_rail.zip", 
+            "data/raw_data/r5r_raw/gtfs_rail.zip")
 
-# remove any leftovers from the failed build
+# remove any leftover files from the failed built network
 file.remove(list.files("data/r5r", pattern = "network.dat|mapdb", full.names = TRUE))
 ```
 
 ```{r, eval=FALSE}
-# rebuild
+# rebuild 
 r5r_core <- r5r::build_network(data_path = "data/r5r")
 ```
 
 ```{r, eval=FALSE}
-# error again
-#Error in `r5r::build_network()`:
-#✖ High priority GTFS errors found; network build failed.
-#ℹ Use `r5r::get_gtfs_errors()` to see them, or review data/r5r/gtfs_errors.csv.
-#Run `rlang::last_trace()` to see where the error occurred.
-```
-
-```{r, eval=FALSE}
-#check again where is the error
+# high priority GTFS errors found
+# check the error from building network
 list.files("data/r5r")
 
 errors <- r5r::get_gtfs_errors("data/r5r")
@@ -554,17 +529,26 @@ errors[errors$priority == "HIGH", ]
 ```
 
 ```{r, eval=FALSE}
-feeds <- c("data/r5r/gtfs_rail_fixed.zip", "data/r5r/itm_london_gtfs.zip")
+# check which GTFS errored
+feeds <- c("data/r5r/gtfs_rail_fixed.zip", 
+           "data/r5r/itm_london_gtfs.zip")
 
+# check for each GTFS feed
 for (f in feeds) {
   gtfs <- read_gtfs(f)
+  # take valid stops id within stops.txt
   valid_stops <- gtfs$stops$stop_id
-
-  bad_trips <- unique(gtfs$stop_times[!(stop_id %in% valid_stops)]$trip_id)
-  message(basename(f), ": ", length(bad_trips), " trips reference missing stops")
-
-  if (length(bad_trips) > 0) {
-    gtfs <- filter_by_trip_id(gtfs, bad_trips, keep = FALSE)
+  # check for stop id in trips that is not in stops.txt
+  invalid_trips <- unique(
+    gtfs$stop_times[
+      !(stop_id %in% valid_stops)
+      ]$trip_id
+    )
+  message(basename(f), ": ", length(invalid_trips), " trips reference missing stops")
+  # if invalid trips exist remove them and 
+  # rewrite this revised version as new zip file 
+  if (length(invalid_trips) > 0) {
+    gtfs <- filter_by_trip_id(gtfs, invalid_trips, keep = FALSE)
     fixed_name <- sub("\\.zip$", "_fix2.zip", f)
     write_gtfs(gtfs, fixed_name)
     message("  wrote ", basename(fixed_name))
@@ -573,19 +557,19 @@ for (f in feeds) {
 ```
 
 ```{r, eval=FALSE}
-# move the error2 rail feed to outside gtfs_original file
+# move the first errored rail feed outside of the folder
 file.rename("data/r5r/gtfs_rail_fixed.zip", "data/raw_data/r5r_raw/gtfs_rail_fixed.zip")
 
-# clear caches and debris from previous attempts
+# clear away any leftover files from the failed built network
 file.remove(list.files("data/r5r", pattern = "mapdb|gtfs_errors|r5r-log|network.dat", full.names = TRUE))
 ```
 
-```{r, eval=FALSE}
-# buld r5r network again
+```{r}
+# final build of r5r network
 r5r_core <- r5r::build_network(data_path = "data/r5r")
 ```
 
-#### 5.2.3. Calculate Travel Time
+#### 4.2.3. Calculate Travel Time
 
 +----------------------+------------------------------------------------------------------------------------------+
 | Arguements           | Link                                                                                     |
@@ -595,25 +579,14 @@ r5r_core <- r5r::build_network(data_path = "data/r5r")
 |                      | <https://www.rdocumentation.org/packages/r5r/versions/2.2.0/topics/detailed_itineraries> |
 +----------------------+------------------------------------------------------------------------------------------+
 
-```{r, eval=FALSE}
-# increase Java memory
-options(java.parameters = "-Xmx12G")
-
-# load library again
-library(r5r)
-
-# build network again
-r5r_core <- r5r::build_network(data_path = "data/r5r")
-```
-
-```{r, eval=FALSE}
+```{r}
 # maximum trip durations
 max_trip_duration120 <- 120 
 ```
 
-```{r, eval=FALSE}
+```{r}
 # can change to just a day (no time) and it will return min time of the entire day
-# 01/07/2026 no strike no abnormal events
+# 07/07/2026 no strike no abnormal events
 departure_datetime <- as.POSIXct("07-07-2026 07:00:00", 
                                  format = "%d-%m-%Y %H:%M:%S",
                                  tz = "Europe/London")
@@ -621,7 +594,7 @@ departure_datetime <- as.POSIXct("07-07-2026 07:00:00",
 
 **Public Transit**
 
-```{r, eval=FALSE}
+```{r}
 # travel by (all kinds) public transport available
 mode_transit <- ("TRANSIT")
 
@@ -639,6 +612,7 @@ TTM_PT <- travel_time_matrix(r5r_core,
 ```
 
 ```{r, eval=FALSE}
+# check
 nrow(TTM_PT)
 head(TTM_PT)
 ```
@@ -650,7 +624,7 @@ saveRDS(TTM_PT, "data/r5r_TTM/r5r_TTM_PT_raw.rds")
 
 **Walk**
 
-```{r, eval=FALSE}
+```{r}
 # travel by walking only 
 mode_walk <- c("WALK")
 
@@ -667,6 +641,7 @@ TTM_walk <- travel_time_matrix(r5r_core,
 ```
 
 ```{r, eval=FALSE}
+# check
 nrow(TTM_walk)
 head(TTM_walk)
 ```
@@ -679,6 +654,7 @@ saveRDS(TTM_walk, "data/r5r_TTM/r5r_TTM_walk_raw.rds")
 **Cycle**
 
 ```{r, eval=FALSE}
+# travel by cycling
 mode_cycle <- c("BICYCLE")
 
 # estimating the travel time
@@ -697,6 +673,7 @@ TTM_cycle <- travel_time_matrix(r5r_core,
 ```
 
 ```{r, eval=FALSE}
+# check
 nrow(TTM_cycle)
 head(TTM_cycle)
 ```
@@ -707,6 +684,7 @@ saveRDS(TTM_cycle, "data/r5r_TTM/r5r_TTM_cycle_raw.rds")
 ```
 
 ```{r, eval=FALSE}
+# check
 nrow(TTM_PT)
 nrow(TTM_walk)
 nrow(TTM_cycle)
@@ -719,7 +697,7 @@ Walking = 3497514
 Cycling = 8288685
 ```
 
-### 5.3. Accessibility Score
+### 4.3. Accessibility Indicators
 
 **Load the TTM objects**
 
@@ -731,23 +709,12 @@ TTM_cycle <- readRDS("data/r5r_TTM/r5r_TTM_cycle_raw.rds")
 ```
 
 ```{r}
-names(TTM_PT)
-names(TTM_walk)
-names(TTM_cycle)
-```
-
-```{r}
-head(TTM_PT)
-head(TTM_walk)
-head(TTM_cycle)
-```
-
-```{r}
+# check cooling effective UGS access point column names
 names(cooling_effective_access_points)
 ```
 
 ```{r}
-# join access point id to find the parent greenspace site
+# join access point id to match the parent greenspace site
 access_point_find <- cooling_effective_access_points %>% 
   st_drop_geometry() %>%
   transmute(
@@ -763,57 +730,66 @@ join_to_site <- function(ttm) {
       from_id = as.character(from_id),
       to_id = as.character(to_id)
     ) %>%
+    # join parent greenspace site with access point id
     left_join(
       access_point_find,
       by = c("to_id" = "id")
     )
 }
 
-# apply func
+# apply function to all travel modes
 TTM_PT <- join_to_site(TTM_PT)
 TTM_walk <- join_to_site(TTM_walk)
 TTM_cycle <- join_to_site(TTM_cycle)
 ```
 
 ```{r}
+# check
 head(TTM_PT)
 head(TTM_walk)
 head(TTM_cycle)
 ```
 
 ```{r}
-# minimum travel time across all of access points of each ugs
+# minimum travel time across all of access points of each UGS
 
-# create func
+# create function
 summarise_to_ugs <- function(ttm) {
   ttm %>%
+    # keep access points where it has a parent greenspace site matched
     filter(!is.na(refToGSite)) %>%
+    # group by origin LSOA from id and parent greenspace site
     group_by(from_id, refToGSite) %>%
+    # take the minimum travel time across all access points
     summarise(travel_time_p50 = min(travel_time_p50, na.rm = TRUE),
               .groups = "drop")
 }
 
-# apply func
+# apply function
 TTM_PT1 <- summarise_to_ugs(TTM_PT)
 TTM_walk1 <- summarise_to_ugs(TTM_walk)
 TTM_cycle1 <- summarise_to_ugs(TTM_cycle)
 ```
 
 ```{r}
+# check
 names(TTM_PT1)
 names(TTM_walk1)
 names(TTM_cycle1)
 ```
 
 ```{r}
+# cumulative opportunity score
 calc_accessibility_score <- function(lsoa_ugs_ttm, mode_name) {
   lsoa_ugs_ttm %>%
     group_by(from_id) %>%
+    # count number of cooling-effective UGS reachable within each threshold (15/60)
     summarise(
       access_score_15 = sum(travel_time_p50 <= 15, na.rm = TRUE),
       access_score_60 = sum(travel_time_p50 <= 60, na.rm = TRUE),
       .groups = "drop"
     ) %>%
+    # add travel mode to variable names for easier reading
     rename_with(
       ~ paste0(.x, "_", mode_name),
       .cols = c(access_score_15, access_score_60)
@@ -822,20 +798,25 @@ calc_accessibility_score <- function(lsoa_ugs_ttm, mode_name) {
 ```
 
 ```{r}
+# calculate cumulative accessibility for each travel mode
+
+# Public transit
 PT_accessibility_score <- calc_accessibility_score(TTM_PT1, "PT")
-
+# Walking
 walking_accessibility_score <- calc_accessibility_score(TTM_walk1, "walk")
-
+# Cycling
 cycling_accessibility_score <- calc_accessibility_score(TTM_cycle1, "cycle")
 ```
 
 ```{r}
+# check
 names(PT_accessibility_score)
 names(walking_accessibility_score)
 names(cycling_accessibility_score)
 ```
 
 ```{r}
+# check 
 head(PT_accessibility_score)
 nrow(PT_accessibility_score)
 summary(PT_accessibility_score)
@@ -844,48 +825,50 @@ summary(PT_accessibility_score)
 **Join all together**
 
 ```{r}
+# combine cumulative accessibility across all travel modes
 accessibility_score_all <- PT_accessibility_score %>%
   full_join(walking_accessibility_score, by = "from_id") %>%
   full_join(cycling_accessibility_score, by = "from_id") %>%
+  # missing values present as 0
   mutate(across(starts_with("access_score"), ~replace_na(.x, 0)))
 ```
 
 ```{r}
+# check
 nrow(accessibility_score_all)
 names(accessibility_score_all)
 head(accessibility_score_all)
 ```
 
 ```{r}
+# check
 summary(accessibility_score_all)
 ```
 
-```{r}
-accessibility_score_all %>% filter(access_score_60_cycle == 0)
-```
+Identified two LSOAs to have 0 values, considered acceptable as it may lie inside a CE UGS already.
 
-Ok, 2 LSOAs have 0s –\> ok to keep it cus it may lie inside a CE UGS already
-
-### 5.5. Minimum Time to Nearest CE UGS
+### 4.4. Minimum Time to Nearest CE UGS
 
 ```{r}
 # calculate min travel time to nearest cooling-effective park for each origin
 calc_min_time <- function(ttm_ugs, mode_name) {
   ttm_ugs %>%
     group_by(from_id) %>%
+    # create minimum travel time variable
     summarise(
       !!paste0("travel_time_min_", mode_name) := min(travel_time_p50, na.rm = TRUE),
       .groups = "drop"
     )
 }
 
-# use TTM_mode1 cus already summarised to quickest access point in each ugs
+# use TTM_mode1 which is already summarised to quickest access point for each cooling effective UGS
 PT_min_time <- calc_min_time(TTM_PT1, "PT")
 walking_min_time <- calc_min_time(TTM_walk1, "walk")
 cycling_min_time <- calc_min_time(TTM_cycle1, "cycle")
 ```
 
 ```{r}
+# join cumulative opportunity variables with minimum travel time variables
 accessibility <- accessibility_score_all %>%
   full_join(PT_min_time, by = "from_id") %>%
   full_join(walking_min_time, by = "from_id") %>%
@@ -893,14 +876,16 @@ accessibility <- accessibility_score_all %>%
 ```
 
 ```{r}
+# check
 nrow(accessibility)
 names(accessibility)
 head(accessibility)
 ```
 
-### 5.6. Join LSOA
+### 4.5. Join LSOA
 
 ```{r}
+# join multimodal accessibility indicators back with LSOAs
 london_lsoa_accessibility <- london_lsoa %>%
   left_join(
     accessibility,
@@ -910,6 +895,7 @@ london_lsoa_accessibility <- london_lsoa %>%
 ```
 
 ```{r}
+# check
 nrow(london_lsoa_accessibility)
 names(london_lsoa_accessibility)
 head(london_lsoa_accessibility)
