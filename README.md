@@ -1,42 +1,44 @@
 # Assessing Spatial Equity in Multimodal Accessibility to Cooling-Effective Urban Green Space: A Case Study of London
 
 ## Overview
-This repository contains the code used for the dissertation submitted in part requirement for the MSc in the Centre for Advanced Spatial Analysis, Bartlett Faculty of the Built Environment, UCL.
+This repository contains the code used for the dissertation submitted in part requirement for the MSc in the Centre for Advanced Spatial Analysis, Bartlett Faculty of the Built Environment, UCL. 
 
-
+This study sets out to answer the following question: *To what extent is multimodal accessibility to cooling-effective urban green spaces equitably distributed across heat exposed and socioeconomically disadvantaged areas in London?* The following sections describes the full reproducible workflow from data preparation, quantification of urban heat and park cooling, multimodal accessibility modelling, and statistical and spatial analyses to assess equity. 
 
 ## Repository Structure
 ```
 london-cooling-access-equity/
 ├── 1_Data_Preparation.Rmd                                
 ├── 1a_Map_Study_Area.Rmd                                 
-├── 2_GoogleEarthEngine_LST_Urban_Heat                    
+├── 2_GoogleEarthEngine_LST_Quantify_Urban_Heat
+├── 2a_Map_LST_and_SUHII.Rmd
 ├── 3_GoogleEarthEngine_Greenspace_Buffer_LST             
 ├── 4_Quantify_Park_Cooling.Rmd                           
 ├── 5_Multimodal_Accessibility_r5r.Rmd                   
 ├── 5a_Map_Travel_Time_Cummulative_Accessibility.Rmd      
 ├── 6_Statistical_Analyses.Rmd                            
 ├── Adobe_Illustrator_Buffer_Schematic_Diagram.ai         # Adobe Illustrator file for green space buffer schematic visualisation
+├── code_draft                                            # Code script drafts
 ├── data/                                                 # Data used for this study, full project data available to download below under Data Availability
 └── figures/                                              # Figures presented in the dissertation document
 ```
 
 ## Reproducibility
 
-The code scripts are structured in the order in which the analysis was performed. 
+The code scripts are structured in the order in which the analysis was performed. Note: `2_GoogleEarthEngine_LST_Quantify_Urban_Heat.txt` and `3_GoogleEarthEngine_Greenspace_Buffer_LST.txt` are to be processed via the [Google Earth Engine Code Editor](https://code.earthengine.google.com/)
 
 ### 1. Data Preparation
 `1_Data_Preparation.Rmd` pre-process and filter datasets to the Greater London study area, and `1a_Map_Study_Area.Rmd` visualises the study area map and spatial context. 
 
 ### 2. Land Surface Temperature (LST) and Quantify Urban Heat
-`2_GoogleEarthEngine_LST_Urban_Heat.txt` is a Google Earth Engine script retrieving Landsat-9 LST data. It also calculates London-level and LSOA-level LST, and deriving surface urban heat intensity to quantify urban heat exposure.
+`2_GoogleEarthEngine_LST_Quantify_Urban_Heat.txt` is a Google Earth Engine script that retrieves Landsat-9 LST data. It also calculates London-level and LSOA-level LST, deriving surface urban heat intensity to quantify urban heat exposure.The corresponding visualisations are in `2a_Map_LST_Quantify_Urban_Heat.Rmd`
 
 
 ### 3. Urban Green Space and Buffer LST 
-`3_GoogleEarthEngine_Greenspace_Buffer_LST.txt` is a Google Earth Engine script retrieving Landsat-9 LST data for urban green spaces and surrounding buffer rings for park cooling analysis.
+`3_GoogleEarthEngine_Greenspace_Buffer_LST.txt` is a Google Earth Engine script that retrieves Landsat-9 LST data for urban green spaces and surrounding buffer rings for park cooling analysis.
 
 ### 4. Quantify Park Cooling
-`4_Quantify_Park_Cooling.Rmd` visualises spatial distribution of LST and urban heat exposure, calculates park cooling indicators and identifying cooling-effective urban green spaces.
+`4_Quantify_Park_Cooling.Rmd` calculates park cooling indicators and identifies cooling-effective urban green spaces.
 
 ### 5. Multimodal Accessibility
 `5_Multimodal_Accessibility_r5r.Rmd` computes multimodal travel time matrices and accessibility indicators to cooling-effective urban green spaces using `r5r`, the corresponding visualisations are in `5a_Map_Travel_Time_Cumulative_Accessibility.Rmd`.
@@ -50,9 +52,8 @@ The code scripts are structured in the order in which the analysis was performed
 Large data files exceeding GitHub's recommended file size limits (50 MB) are not included in this repository.
 
 The full project data can be downloaded here: [Download Project Data](https://liveuclac-my.sharepoint.com/:f:/r/personal/ucfncc0_ucl_ac_uk/Documents/data?d=wdf9102e4c20d400e956e7c03bff41fd0&csf=1&web=1&e=ZZgeIa),
-or obtained directly from the below [Data Sources](https://github.com/christychoicc/london-cooling-access-equity#data-sources) section.
+or obtained directly from the below [Data Sources](https://github.com/christychoicc/london-cooling-access-equity#data-sources) section. The *data/* directory is structured as follows:  
 
-After downloading, the project data are to be stored locally under the *data/* directory in the following structure:  
 ```
 data/
 ├── raw_data/                                             # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 

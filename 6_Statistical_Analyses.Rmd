@@ -2,6 +2,8 @@
 title: "6_Statistical_Analyses"
 ---
 
+This markdown contains the code for GLM (Section 5) and BYM2 regression modelling (Section 6), validating models, testing model residuals spatial autocorrelation and BiLISA clustering analysis (Section 7). Data loading, preparation, wrangling and exploratory data analysis are performed in Section 1-3 prior the statistical analyses in the subsequent sections.
+
 Spatial tools: <https://doc.esri.com/en/arcgis-pro/latest/tool-reference/spatial-statistics/an-overview-of-the-modeling-spatial-relationships-toolset.html>
 
 ```{r}
@@ -515,7 +517,9 @@ model_variables <- london_join %>%
 
 To model geographic variation in count data, use poisson or negative binomial modelling likelihoods.
 
-## 5. Negative Binomial GLM
+## 5. GLM
+
+### 5.1. Negative Binomial 
 
 Loop all models:
 
@@ -561,7 +565,7 @@ for (nm in names(models_nb)) {
 }
 ```
 
-## 6. Poisson Regression
+### 5.2. Poisson 
 
 ```{r}
 # independent variables to be the same for every model
@@ -664,7 +668,7 @@ AIC values as below table (bold text refers to lower AIC values. As well as disp
 | access_score_15_cycle | **21932**               | 22076         |
 | access_score_60_cycle | **42929**               | 55092         |
 
-## 7. Residuals with Moran's I
+### 5.3. Residuals with Moran's I
 
 **Build spatial weights with LSOA boundary**
 
@@ -712,7 +716,7 @@ LLSOA.knn_4_weight <- LLSOA_knn %>%
   nb2listw(., style="W")
 ```
 
-### 7.1. Models VIF and Residuals
+#### 5.3.1.  Models VIF and Residuals
 
 ```{r}
 glm_models <- list(
@@ -792,11 +796,9 @@ glm_moran_results <- bind_rows(
     }
   )
 )
-
-glm_moran_results
 ```
 
-### 7.7. Summary of Models' residuals
+#### 5.3.2. Summary of Models' residuals
 
 ```{r}
 # GLM Moran's I summary from above results
@@ -883,7 +885,7 @@ knitr::kable(
 
 Strong positive spatial autocorrelation for queens case and nearest neighbours by Moran's I for all models, so next use spatial models
 
-## 8. Global Spatial Regression model (BYM2)
+## 6. Global Spatial Regression model (BYM2)
 
 Given that the data type is count data, traditional spatial error models may not be suitable here ( <https://www.econstor.eu/bitstream/10419/168040/1/89655662X.pdf>).
 
@@ -896,22 +898,7 @@ Bayesian spatial multilevel mixed-effects model incoporating BMY2 with `INLA` pa
 #install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
 
 # safer to download package with this:
-install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/testing"), dep=TRUE)
-```
-
-```{r}
-# reload packages (if restarted R)
-library(ggplot2)
-library(tmap)
-library(cowplot)
-library(sf)
-library(spdep)
-library(dplyr)
-library(tidyverse)
-library(broom)
-library(INLA)
-library(INLAtools)
-library(performance)
+# install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/testing"), dep=TRUE)
 ```
 
 ```{r}
@@ -957,7 +944,7 @@ spatial_model_variables <- model_variables %>%
 class(spatial_model_variables)
 ```
 
-### 8.1. Spatial Neighbourhood structure
+### 6.1. Spatial Neighbourhood structure
 
 ```{r}
 # from here onwards adapted code from: 
@@ -974,7 +961,7 @@ nb <- spdep::poly2nb(
 )
 
 # 2. Convert the neighbor list to INLA adjacency format
-spdep::nb2INLA("map.graph", nb)
+spdep::nb2INLA("data/map.graph", nb)
 
 # 3. Set the location of the adjacency file for INLA
 map.adj <- file.path(getwd(), "data", "map.graph")
@@ -983,7 +970,7 @@ map.adj <- file.path(getwd(), "data", "map.graph")
 g <- inla.read.graph(filename = map.adj)
 ```
 
-### 8.2. Inla call/ fit - Generalised Linear Models (Poisson)
+### 6.2. Inla call/ fit - Generalised Linear Models (Poisson)
 
 ```{r}
 # index for spatial effects
@@ -1035,9 +1022,7 @@ for (model_name in names(bym2_dependents)) {
   dependent <- bym2_dependents[[model_name]]
   
   # create model with formula as defined above
-  model_formula <- create_bym2_formula(
-    dependent
-  )
+  model_formula <- create_bym2_formula(dependent)
   
   # fit BYM2 Poisson model
   model_bym2 <- INLA::inla(
@@ -1067,7 +1052,7 @@ for (model_name in names(bym2_dependents)) {
     )
   )
   
-  # remove model from memory before fitting the next dependent variable model
+  # remove model before fitting the next model
   rm(model_bym2)
   gc()
 }
@@ -1137,9 +1122,9 @@ knitr::kable(
 )
 ```
 
-### 8.3. Validation Checks
+### 6.3. Validation Checks
 
-#### 8.3.1. Diagnostic
+#### 6.3.1. Diagnostic
 
 <https://becarioprecario.bitbucket.io/inla-gitbook/ch-INLA.html#sec:modelassess>
 
@@ -1278,7 +1263,7 @@ sum(log(model_15_cycle_bym2_cpo$cpo$cpo), na.rm = TRUE)
 
 Barely any changes after recompute, move on...
 
-**Queens Continguity Adjacency Graph checks**
+**Queens Contiguity Adjacency Graph checks**
 
 ```{r}
 # check if grraph nodes matches LSOAs
@@ -1309,7 +1294,7 @@ cat(
 )
 ```
 
-#### 8.3.3. Residuals
+#### 6.3.2. Residuals
 
 Rebuild the centroids, queens and knn
 
@@ -1448,9 +1433,6 @@ bym2_moran_results <- bind_rows(
     }
   )
 )
-
-# display results
-bym2_moran_results
 ```
 
 These results showed significantly reduced compared to the GLM models, but still some spatial autocorrelation remains –\> write in discussion
@@ -1463,7 +1445,7 @@ bym2_morans_table <- bym2_moran_results %>%
   dplyr::select(
     model,
     weights,
-    estimate,
+    estimate1,
     p.value
   ) %>%
   
@@ -1529,7 +1511,7 @@ knitr::kable(
 )
 ```
 
-## 9. BiLISA - Bivariate LISA mapping
+## 7. BiLISA - Bivariate LISA mapping
 
 Well known method to address issues of spatial nonstationarity, allowing geographic variations in the relationships between dependent and explanatory variables –\> use `spdep` package
 
@@ -1547,152 +1529,14 @@ bilisa_weights <-  bilisa_nb %>%
   nb2listw(.,style = "W",)
 ```
 
-### 9.1. Map SUHII
+### 7.1. Map SUHII
+
+code adpated from:
+
+<https://r-spatial.github.io/spdep/reference/localmoran_bv.html>
 
 ```{r}
-# code adpated from: 
-# https://r-spatial.github.io/spdep/reference/localmoran_bv.html
-
-bilisa_15_pt_suhii <- localmoran_bv(
-  x = bilisa_variables$access_score_15_pt,
-  y = bilisa_variables$suhii_z,
-  listw = bilisa_weights,
-  nsim = 199,
-  scale = TRUE,
-  alternative = "two.sided",
-  iseed = 42,
-  zero.policy = TRUE
-)
-
-head(bilisa_15_pt_suhii)
-```
-
-```{r}
-# to identify significant cluster only (keep p<0.05 only) 
-bilisa_cluster <- spdep::hotspot(
-  bilisa_15_pt_suhii,
-  Prname = "Pr(folded) Sim",
-  cutoff = 0.05,
-  quadrant.type = "pysal",
-  p.adjust = "none"
-)
-```
-
-```{r}
-bilisa_variables$bilisa_cluster <- as.character(
-  bilisa_cluster
-)
-
-bilisa_variables$bilisa_cluster[
-  is.na(bilisa_variables$bilisa_cluster)
-] <- "Not significant"
-```
-
-```{r}
-table(bilisa_variables$bilisa_cluster)
-```
-
-```{r}
-tmap_mode("plot")
-
-tm_shape(bilisa_variables) +
-  tm_polygons(
-    fill = "bilisa_cluster",
-    fill.scale = tm_scale_categorical(),
-    fill.legend = tm_legend(
-      title = "BiLISA Cluster"
-    ),
-    col = NA
-  ) +
-  tm_title(
-    "15-minute Public Transit Accessibility and SUHII"
-  )
-```
-
-```{r}
-# reorder clusters and make better labels
-bilisa_variables <- bilisa_variables %>%
-  mutate(
-    bilisa_cluster_plot = case_when(
-      bilisa_cluster == "Low-High" ~ "Low access–High SUHII",
-      bilisa_cluster == "High-High" ~ "High access–High SUHII",
-      bilisa_cluster == "Low-Low" ~ "Low access–Low SUHII",
-      bilisa_cluster == "High-Low" ~ "High access–Low SUHII",
-      TRUE ~ NA_character_
-    )
-  )
-
-# set legend order
-bilisa_variables$bilisa_cluster_plot <- factor(
-  bilisa_variables$bilisa_cluster_plot,
-  levels = c(
-    "Low access–High SUHII",
-    "High access–High SUHII",
-    "Low access–Low SUHII",
-    "High access–Low SUHII"
-  )
-)
-
-
-cluster_cols <- c(
-  "Low access–High SUHII"  = "#B2182B", 
-  "High access–High SUHII" = "#FDDBC7",  
-  "Low access–Low SUHII"   = "#D1E5F0",
-  "High access–Low SUHII"  = "#2166AC" 
-)
-```
-
-```{r}
-tmap_mode("plot")
-
-bilisa_15_pt_suhii_suhii_map <-
-  tm_shape(bilisa_variables) +
-  tm_fill(
-    fill = "white"
-  ) +
-
-  # Significant clusters
-  tm_shape(
-    dplyr::filter(
-      bilisa_variables,
-      !is.na(bilisa_cluster_plot)
-    )
-  ) +
-  tm_fill(
-    fill = "bilisa_cluster_plot",
-    fill.scale = tm_scale_categorical(
-      values = cluster_cols
-    ),
-    fill.legend = tm_legend(
-      title = "BiLISA cluster",
-      position = tm_pos_out("right", "center"),
-      frame = FALSE
-    )
-  ) +
-
-  # London boundary must come last
-  tm_shape(london_boundary) +
-  tm_borders(
-    col = "grey30",
-    lwd = 1
-  ) +
-
-  tm_title(
-    "15-minute PT accessibility\nand SUHII"
-  ) +
-
-  tm_layout(
-    frame = FALSE,
-    bg.color = "white",
-    outer.margins = 0.02
-  )
-
-bilisa_15_pt_suhii_suhii_map 
-```
-
-**Loop over maps:**
-
-```{r}
+# function to run BiLISA analysis and create cluster maps
 run_bilisa_map <- function(
     data,
     access_var,
@@ -1706,7 +1550,7 @@ run_bilisa_map <- function(
     show_legend = TRUE
 ) {
 
-  # Standardise only the accessibility variable
+  # standardise accessibility variable
   access_z <- as.numeric(
     scale(data[[access_var]])
   )
@@ -1714,13 +1558,13 @@ run_bilisa_map <- function(
   # SUHII or IMD is already a z-score
   context_z <- data[[context_var]]
 
-  # Check that both variables and weights have matching lengths
+  # check that variables and weights have matching lengths
   stopifnot(
     length(access_z) == length(context_z),
     length(access_z) == length(listw$neighbours)
   )
 
-  # Bivariate Local Moran's I
+  # calculate Bivariate Local Moran's I
   lisa_result <- spdep::localmoran_bv(
     x = access_z,
     y = context_z,
@@ -1732,7 +1576,7 @@ run_bilisa_map <- function(
     zero.policy = TRUE
   )
 
-  # to identify significant cluster only (keep p<0.05 only) 
+  # identify significant clusters at p < 0.05
   lisa_cluster <- spdep::hotspot(
     lisa_result,
     Prname = "Pr(folded) Sim",
@@ -1741,7 +1585,7 @@ run_bilisa_map <- function(
     p.adjust = "none"
   )
 
-  # Full, readable cluster labels
+  # create readable cluster labels
   cluster_labels <- c(
     "Low-High" =
       paste0("Low access–High ", context_label),
@@ -1756,6 +1600,7 @@ run_bilisa_map <- function(
       paste0("High access–Low ", context_label)
   )
 
+  # set cluster order
   cluster_levels <- unname(
     cluster_labels[
       c(
@@ -1767,6 +1612,7 @@ run_bilisa_map <- function(
     ]
   )
 
+  # set cluster colours
   cluster_colours <- stats::setNames(
     c(
       "#B2182B",  # Low-High
@@ -1777,7 +1623,7 @@ run_bilisa_map <- function(
     cluster_levels
   )
 
-  # Create a separate result dataset
+  # add BiLISA results to spatial data
   result_data <- data %>%
     dplyr::mutate(
       bilisa_i = as.numeric(lisa_result[, 1]),
@@ -1800,13 +1646,13 @@ run_bilisa_map <- function(
       )
     )
 
-  # Significant areas only
+  # keep significant clusters for plotting
   significant_data <- result_data %>%
     dplyr::filter(
       !is.na(bilisa_cluster_plot)
     )
 
-  # Show or hide the legend
+  # show or hide legend
   legend_setting <- if (show_legend) {
     tm_legend(
       title = "BiLISA cluster",
@@ -1817,7 +1663,7 @@ run_bilisa_map <- function(
     tm_legend_hide()
   }
 
-  # Create the map
+  # create map
   map_object <-
     tm_shape(result_data) +
     tm_fill(
@@ -1835,7 +1681,7 @@ run_bilisa_map <- function(
       fill.legend = legend_setting
     ) +
 
-    # London boundary last
+    # add Greater London boundary
     tm_shape(boundary) +
     tm_borders(
       col = "grey30",
@@ -1852,7 +1698,7 @@ run_bilisa_map <- function(
       outer.margins = 0.02
     )
 
-  # Return everything
+  # return BiLISA results, clusters, spatial data and map
   list(
     result = lisa_result,
     clusters = lisa_cluster,
@@ -1863,207 +1709,68 @@ run_bilisa_map <- function(
 ```
 
 ```{r}
-bilisa_15_pt_suhii <- run_bilisa_map(
-  data = bilisa_variables,
-  access_var = "access_score_15_pt",
-  context_var = "suhii_z",
-  context_label = "SUHII",
-  map_title = NULL,
-  show_legend = FALSE
+# accessibility variables for BiLISA analyses
+bilisa_access_variables <- c(
+  "15_pt" = "access_score_15_pt",
+  "60_pt" = "access_score_60_pt",
+  "15_walk" = "access_score_15_walk",
+  "60_walk" = "access_score_60_walk",
+  "15_cycle" = "access_score_15_cycle",
+  "60_cycle" = "access_score_60_cycle"
 )
 
-# assign as object
-bilisa_15_pt_suhii_map <- bilisa_15_pt_suhii$map
-
-# plot
-#bilisa_15_pt_suhii_map
-```
-
-```{r}
-bilisa_60_pt_suhii <- run_bilisa_map(
-  data = bilisa_variables,
-  access_var = "access_score_60_pt",
-  context_var = "suhii_z",
-  context_label = "SUHII",
-  map_title = NULL,
-  show_legend = FALSE
+# contextual variables for BiLISA analyses
+bilisa_context_variables <- c(
+  "suhii" = "suhii_z",
+  "imd" = "imd_z"
 )
 
-# assign as object
-bilisa_60_pt_suhii_map <- bilisa_60_pt_suhii$map
-
-# plot
-#bilisa_60_pt_suhii_map
-```
-
-```{r}
-bilisa_15_walk_suhii <- run_bilisa_map(
-  data = bilisa_variables,
-  access_var = "access_score_15_walk",
-  context_var = "suhii_z",
-  context_label = "SUHII",
-  map_title = NULL,
-  show_legend = FALSE
+# labels for contextual variables
+bilisa_context_labels <- c(
+  "suhii" = "SUHII",
+  "imd" = "IMD"
 )
 
-# assign as object
-bilisa_15_walk_suhii_map <- bilisa_15_walk_suhii$map
 
-# plot
-#bilisa_15_walk_suhii_map
-```
+# loop through all accessibility and contextual-variable combinations
+for (access_name in names(bilisa_access_variables)) {
 
-```{r}
-bilisa_60_walk_suhii <- run_bilisa_map(
-  data = bilisa_variables,
-  access_var = "access_score_60_walk",
-  context_var = "suhii_z",
-  context_label = "SUHII",
-  map_title = NULL,
-  show_legend = FALSE
-)
+  for (context_name in names(bilisa_context_variables)) {
 
-# assign as object
-bilisa_60_walk_suhii_map <- bilisa_60_walk_suhii$map
+    # run BiLISA analysis and create map
+    bilisa_result <- run_bilisa_map(
+      data = bilisa_variables,
+      access_var = bilisa_access_variables[[access_name]],
+      context_var = bilisa_context_variables[[context_name]],
+      context_label = bilisa_context_labels[[context_name]],
+      map_title = NULL,
+      show_legend = FALSE
+    )
 
-# plot
-#bilisa_60_walk_suhii_map
-```
+    # save result using the original object name
+    assign(
+      paste0(
+        "bilisa_",
+        access_name,
+        "_",
+        context_name
+      ),
+      bilisa_result
+    )
 
-```{r}
-bilisa_15_cycle_suhii <- run_bilisa_map(
-  data = bilisa_variables,
-  access_var = "access_score_15_cycle",
-  context_var = "suhii_z",
-  context_label = "SUHII",
-  map_title = NULL,
-  show_legend = FALSE
-)
-
-# assign as object
-bilisa_15_cycle_suhii_map <- bilisa_15_cycle_suhii$map
-
-# plot
-#bilisa_15_cycle_suhii_map
-```
-
-```{r}
-bilisa_60_cycle_suhii <- run_bilisa_map(
-  data = bilisa_variables,
-  access_var = "access_score_60_cycle",
-  context_var = "suhii_z",
-  context_label = "SUHII",
-  map_title = NULL,
-  show_legend = FALSE
-)
-
-# assign as object
-bilisa_60_cycle_suhii_map <- bilisa_60_cycle_suhii$map
-
-# plot
-#bilisa_60_cycle_suhii_map
-```
-
-```{r}
-bilisa_15_pt_imd <- run_bilisa_map(
-  data = bilisa_variables,
-  access_var = "access_score_15_pt",
-  context_var = "imd_z",
-  context_label = "IMD",
-  map_title = NULL,
-  show_legend = FALSE
-)
-
-# assign as object
-bilisa_15_pt_imd_map <- bilisa_15_pt_imd$map
-
-# plot
-#bilisa_15_pt_imd_map
-```
-
-```{r}
-bilisa_60_pt_imd <- run_bilisa_map(
-  data = bilisa_variables,
-  access_var = "access_score_60_pt",
-  context_var = "imd_z",
-  context_label = "IMD",
-  map_title = NULL,
-  show_legend = FALSE
-)
-
-# assign as object
-bilisa_60_pt_imd_map <- bilisa_60_pt_imd$map
-
-# plot
-#bilisa_60_pt_imd_map
-```
-
-```{r}
-bilisa_15_walk_imd <- run_bilisa_map(
-  data = bilisa_variables,
-  access_var = "access_score_15_walk",
-  context_var = "imd_z",
-  context_label = "IMD",
-  map_title = NULL,
-  show_legend = FALSE
-)
-
-# assign as object
-bilisa_15_walk_imd_map <- bilisa_15_walk_imd$map
-
-# plot
-#bilisa_15_walk_imd_map
-```
-
-```{r}
-bilisa_60_walk_imd <- run_bilisa_map(
-  data = bilisa_variables,
-  access_var = "access_score_60_walk",
-  context_var = "imd_z",
-  context_label = "IMD",
-  map_title = NULL,
-  show_legend = FALSE
-)
-
-# assign as object
-bilisa_60_walk_imd_map <- bilisa_60_walk_imd$map
-
-# plot
-#bilisa_60_walk_imd_map
-```
-
-```{r}
-bilisa_15_cycle_imd <- run_bilisa_map(
-  data = bilisa_variables,
-  access_var = "access_score_15_cycle",
-  context_var = "imd_z",
-  context_label = "IMD",
-  map_title = NULL,
-  show_legend = FALSE
-)
-
-# assign as object
-bilisa_15_cycle_imd_map <- bilisa_15_cycle_imd$map
-
-# plot
-#bilisa_15_cycle_imd_map
-```
-
-```{r}
-bilisa_60_cycle_imd <- run_bilisa_map(
-  data = bilisa_variables,
-  access_var = "access_score_60_cycle",
-  context_var = "imd_z",
-  context_label = "IMD",
-  map_title = NULL,
-  show_legend = FALSE
-)
-
-# assign as object
-bilisa_60_cycle_imd_map <- bilisa_60_cycle_imd$map
-
-# plot
-#bilisa_60_cycle_imd_map
+    # save map using the original object name
+    assign(
+      paste0(
+        "bilisa_",
+        access_name,
+        "_",
+        context_name,
+        "_map"
+      ),
+      bilisa_result$map
+    )
+  }
+}
 ```
 
 **Cowplot Combine Maps**
@@ -2197,7 +1904,7 @@ bilisa_15_final <- cowplot::plot_grid(
 bilisa_15_final
 ```
 
-```{r, eval= FALSE}
+```{r}
 # save as png
 ggsave(
   filename = "figures/FigD1_BiLISA_15_min_LH.png",
@@ -2274,7 +1981,7 @@ bilisa_60_final <- cowplot::plot_grid(
 bilisa_60_final
 ```
 
-```{r, eval=FALSE}
+```{r}
 ggsave(
   filename = "figures/FigD2_BiLISA_60_min_LH.png",
   plot = bilisa_60_final,
@@ -2286,7 +1993,7 @@ ggsave(
 )
 ```
 
-### 9.2. Distribution of BiLISA Cluster
+### 7.2. Distribution of BiLISA Cluster
 
 ```{r}
 # Put the 12 existing BiLISA objects into a named list
@@ -2410,7 +2117,7 @@ bilisa_table <- bilisa_counts %>%
 bilisa_table
 ```
 
-### 9.3. Low High BiLISA
+### 7.3. Low High BiLISA
 
 ```{r}
 # Function to compare the Low access–High SUHII and
@@ -2464,25 +2171,6 @@ create_priority_two_combined <- function(suhii_object, imd_object) {
       )
     )
 }
-
-
-# Public transport
-two_combined_15_pt <- create_priority_two_combined(
-  suhii_object = bilisa_15_pt_suhii,
-  imd_object = bilisa_15_pt_imd
-)
-
-# Walking
-two_combined_15_walk <- create_priority_two_combined(
-  suhii_object = bilisa_15_walk_suhii,
-  imd_object = bilisa_15_walk_imd
-)
-
-# Cycling
-two_combined_15_cycle <- create_priority_two_combined(
-  suhii_object = bilisa_15_cycle_suhii,
-  imd_object = bilisa_15_cycle_imd
-)
 ```
 
 ```{r}
@@ -2521,19 +2209,68 @@ create_two_combined_map <- function(data) {
     )
 }
 
-
-# Create the three maps
-two_combined_15_pt_map <- create_two_combined_map(
-  two_combined_15_pt
+# accessibility measures for combined Low-High analysis
+combined_access_names <- c(
+  "15_pt",
+  "15_walk",
+  "15_cycle",
+  "60_pt",
+  "60_walk",
+  "60_cycle"
 )
 
-two_combined_15_walk_map <- create_two_combined_map(
-  two_combined_15_walk
-)
 
-two_combined_15_cycle_map <- create_two_combined_map(
-  two_combined_15_cycle
-)
+# create combined SUHII/IMD classifications and maps
+for (access_name in combined_access_names) {
+
+  # get corresponding SUHII BiLISA result
+  suhii_object <- get(
+    paste0(
+      "bilisa_",
+      access_name,
+      "_suhii"
+    )
+  )
+
+  # get corresponding IMD BiLISA result
+  imd_object <- get(
+    paste0(
+      "bilisa_",
+      access_name,
+      "_imd"
+    )
+  )
+
+  # combine Low-High SUHII and IMD classifications
+  combined_result <- create_priority_two_combined(
+    suhii_object = suhii_object,
+    imd_object = imd_object
+  )
+
+  # keep original combined result object name
+  assign(
+    paste0(
+      "two_combined_",
+      access_name
+    ),
+    combined_result
+  )
+
+  # create combined classification map
+  combined_map <- create_two_combined_map(
+    combined_result
+  )
+
+  # keep original map object name
+  assign(
+    paste0(
+      "two_combined_",
+      access_name,
+      "_map"
+    ),
+    combined_map
+  )
+}
 
 
 # Convert tmap maps into grobs for cowplot
@@ -2643,7 +2380,7 @@ two_combined_15_final
 ```{r}
 # save as PNG
 ggsave(
-  filename = "figures/Fig12_BiLISA_15_min_Combined.png",
+  filename = "figures/Fig13_BiLISA_15_min_LH_Combined.png",
   plot = two_combined_15_final,
   width = 9,
   height = 11,
@@ -2654,42 +2391,6 @@ ggsave(
 ```
 
 ```{r}
-# Create the combined classifications
-
-# Public transit
-two_combined_60_pt <- create_priority_two_combined(
-  suhii_object = bilisa_60_pt_suhii,
-  imd_object = bilisa_60_pt_imd
-)
-
-# Walking
-two_combined_60_walk <- create_priority_two_combined(
-  suhii_object = bilisa_60_walk_suhii,
-  imd_object = bilisa_60_walk_imd
-)
-
-# Cycling
-two_combined_60_cycle <- create_priority_two_combined(
-  suhii_object = bilisa_60_cycle_suhii,
-  imd_object = bilisa_60_cycle_imd
-)
-
-
-
-# Create  three maps 
-two_combined_60_pt_map <- create_two_combined_map(
-  two_combined_60_pt
-)
-
-two_combined_60_walk_map <- create_two_combined_map(
-  two_combined_60_walk
-)
-
-two_combined_60_cycle_map <- create_two_combined_map(
-  two_combined_60_cycle
-)
-
-
 # Convert tmap objects into grobs for cowplot 
 two_combined_60_grobs <- list(
   tmap::tmap_grob(two_combined_60_pt_map),
@@ -2747,7 +2448,7 @@ two_combined_60_final <- cowplot::ggdraw() +
 two_combined_60_final
 ```
 
-```{r, eval=FALSE}
+```{r}
 # save as PNG
 ggsave(
   filename = "figures/Fig14_BiLISA_60_min_LH_Combined.png",
@@ -2760,7 +2461,7 @@ ggsave(
 )
 ```
 
-### 9.4. Summary of overlap L-H clusters of High SUHII and IMD
+### 7.4. Summary of overlap L-H clusters of High SUHII and IMD
 
 ```{r}
 # Put all six overlap objects into a named list

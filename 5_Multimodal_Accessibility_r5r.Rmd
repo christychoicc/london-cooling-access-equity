@@ -2,7 +2,7 @@
 title: "5_Multimodal_Accessibility_r5r"
 ---
 
-This markdown file contains the code for ......
+This markdown file contains the code for taking origin and destination points, building r5r routing network for obtaining travel time matrices to derive accessibility indicators (minimum travel time and cumulative opportunity).
 
 ```{r}
 # remove objects from R environment and clear memory
