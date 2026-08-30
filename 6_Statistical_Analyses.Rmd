@@ -44,19 +44,13 @@ library(performance)
 
 Clean names, select initial needed columns and rename columns for consistency across datasets
 
-**Greater London Boundary:**
-
 ```{r}
+# greater london boundary 
 london_boundary <- st_read("data/gla/London_GLA_Boundary.shp")
-```
 
-**London only LSOAs**
-
-```{r}
+# london lsoa boundaries
 london_lsoa <- st_read("data/lsoa_london/lsoa_london.shp")
 ```
-
-**Data obtained from previous pre-processing**
 
 ```{r}
 # travel time 
@@ -89,19 +83,21 @@ suhii_lsoa <- st_read("data/London_LSOA_LST_SUHI/London_LSOA_LST_SUHI.shp")%>%
   dplyr::select(
     lsoa21cd,
     lsoa21nm,
+    # mean LST per LSOA
     mean,
+    # london mean LST
     london_mea,
+    # SUHII equivalent
     lst_differ,
     geometry
   )%>%
+  # rename column names which were cut short from GEE export
   rename(
     mean_lst_lsoa = mean,
     london_mean = london_mea,
     suhii = lst_differ
   )
 ```
-
-**IMD 2025 data**
 
 ```{r}
 # IMD score
@@ -119,9 +115,9 @@ imd_score <- read_csv("data/IMD_2025.csv")%>%
   )
 ```
 
-**Census Data**
-
 ```{r}
+#  census data
+
 # TS006 population density
 census_pop_density <- read_csv("data/census2021/census2021-ts006-lsoa.csv")%>%
   clean_names()%>%
@@ -135,9 +131,7 @@ census_pop_density <- read_csv("data/census2021/census2021-ts006-lsoa.csv")%>%
     lsoa21nm = geography,
     pop_density = population_density_persons_per_square_kilometre_measures_value
   )
-```
 
-```{r}
 # TS007a age by 5 year band
 census_age_5year_band <- read_csv("data/census2021/census2021-ts007a-lsoa.csv")%>%
   clean_names()%>%
@@ -163,49 +157,7 @@ census_age_5year_band <- read_csv("data/census2021/census2021-ts007a-lsoa.csv")%
     age_80_to_84 = age_aged_80_to_84_years,
     age_85_and_over = age_aged_85_years_and_over
   )
-```
 
-```{r, eval=FALSE}
-# TS038 disability
-census_disability <- read_csv("data/census2021/census2021-ts038-lsoa.csv")%>%
-  clean_names()%>%
-  select(
-    geography,
-    geography_code,
-    disability_total_all_usual_residents,
-    disability_disabled_under_the_equality_act
-  )%>%
-  rename(
-    lsoa21cd = geography_code,
-    lsoa21nm = geography,
-    # total number of residents 
-    disability_total_residents = disability_total_all_usual_residents,
-    # disabled under the Equality Act 2010
-    disabled = disability_disabled_under_the_equality_act
-  )
-```
-
-```{r, eval=FALSE}
-# TS037 general health
-census_health <- read_csv("data/census2021/census2021-ts037-lsoa.csv")%>% 
-  clean_names()%>%
-  select(
-    geography,
-    geography_code,
-    general_health_total_all_usual_residents,
-    general_health_bad_health,
-    general_health_very_bad_health
-  )%>%
-  rename(
-    lsoa21cd = geography_code,
-    lsoa21nm = geography,
-    general_health_total_residents = general_health_total_all_usual_residents,
-    general_health_bad = general_health_bad_health,
-    general_health_very_bad = general_health_very_bad_health
-  )
-```
-
-```{r}
 # TS021 Ethnicity
 # definition of ethnic minority groups
 # https://www.ethnicity-facts-figures.service.gov.uk/style-guide/writing-about-ethnicity/ 
@@ -229,44 +181,10 @@ census_ethnicity <- read_csv("data/census2021/census2021-ts021-lsoa.csv")%>%
 
 ## 1. Data Cleaning
 
-### Check Loaded + Initial Cleaned Data Column Names
+### 1.1. Wrangle data variables for regression modelling
 
 ```{r}
-names(london_lsoa)
-```
-
-```{r}
-# check 3 modes 
-names(multimodal_accessibility_lsoa)
-```
-
-```{r}
-# check names in SUHII export
-names(suhii_lsoa)
-```
-
-```{r}
-# check IMD names
-names(imd_score)
-```
-
-```{r}
-# check census data
-names(census_pop_density)
-```
-
-```{r}
-names(census_age_5year_band)
-```
-
-```{r}
-names(census_ethnicity)
-```
-
-### Wrangle data variables for regression modelling
-
-```{r}
-# filter for london lsoas only
+# take lsoa codes for filtering for london lsoas only
 london_lsoa_codes <- london_lsoa %>%
   clean_names() %>%
   pull(lsoa21cd)
@@ -308,39 +226,6 @@ census_age_cleaned <- census_age_5year_band %>%
   filter(lsoa21cd %in% london_lsoa_codes)
 ```
 
-```{r, eval=FALSE}
-census_disability_cleaned <- census_disability %>%
-  mutate(
-    disability_pct = ifelse(
-      disability_total_residents > 0,
-      (disabled / disability_total_residents)* 100,
-      NA
-    )
-  )%>% 
-  filter(lsoa21cd %in% london_lsoa_codes)
-```
-
-```{r, eval=FALSE}
-census_health_cleaned <- census_health %>%
-  mutate(
-    health_bad_verybad = rowSums(
-      across(
-        c(
-          general_health_bad,
-          general_health_very_bad
-        )
-      ),
-      na.rm = TRUE
-    ),
-    health_bad_verybad_pct = ifelse(
-      general_health_total_residents > 0,
-      (health_bad_verybad / general_health_total_residents)* 100,
-      NA
-    )
-  )%>% 
-  filter(lsoa21cd %in% london_lsoa_codes)
-```
-
 ```{r}
 # create ethnic minority group variable
 census_ethnicity_cleaned <- census_ethnicity %>%
@@ -366,7 +251,7 @@ imd_score_cleaned <- imd_score %>%
   filter(lsoa21cd %in% london_lsoa_codes)
 ```
 
-### Join Data
+### 1.2. Join Data
 
 ```{r}
 # join data
@@ -402,20 +287,6 @@ london_join <- multimodal_accessibility_lsoa %>%
       dplyr::select(lsoa21cd, age_4_and_under_pct, age_65_and_over_pct),
     by = "lsoa21cd"
   ) %>%
-  
-  # disability
-  #left_join(
-    #census_disability_cleaned %>%
-      #select(lsoa21cd, disability_pct),
-    #by = "lsoa21cd"
-  #) %>%
-  
-  # health
-  #left_join(
-    #census_health_cleaned %>%
-      #select(lsoa21cd, health_bad_verybad_pct),
-    #by = "lsoa21cd"
-  #) %>%
   
   # ethnicity
   left_join(
@@ -461,7 +332,7 @@ check_data <- london_join %>%
   summarise(across(everything(), ~class(.)[1])) %>%
   pivot_longer(everything(), names_to = "variable", values_to = "type")
 
-view(check_data)
+#view(check_data)
 ```
 
 ```{r}
@@ -486,29 +357,29 @@ london_join %>%
 **Plot Variables Distribution**
 
 ```{r}
-# Select only numeric columns
+# select only numeric columns
 numeric_cols <- london_join %>%
   sf::st_drop_geometry() %>%
   dplyr::select(where(is.numeric))
 
-# Convert to long format for faceting
+# convert to long format for faceting
 numeric_long <- numeric_cols %>%
   pivot_longer(cols = everything(), names_to = "variable", values_to = "value")
 
-# Plot faceted histograms
+# plot faceted histograms
 variables_dist_hist <- ggplot(numeric_long, aes(x = value)) +
   geom_histogram(bins = 30, fill = "steelblue", color = "white") +
   facet_wrap(~ variable, scales = "free", ncol = 3) +
   theme_minimal() +
   labs(title = "Histograms of Numerical Variables")
 
-#variables_dist_hist
+variables_dist_hist
 ```
 
-```{r, eval=FALSE}
+```{r}
 # save as PNG
 ggsave(
-  filename = "figures/Fig_Appendix_Variables_Distribution_Hist.png",
+  filename = "figures/FigC1_Adjusted_PIT_Histograms.png",
   plot = variables_dist_hist,
   width = 7.5,
   height = 10,
@@ -521,7 +392,7 @@ ggsave(
 **Plot Heatmap Correlation (Spearman)**
 
 ```{r}
-# Select only the numeric variables (drop codes, names, geometry)
+# select only the numeric variables 
 corr_matrix_spearman <- london_join %>%
   st_drop_geometry() %>%
   dplyr::select(
@@ -531,12 +402,12 @@ corr_matrix_spearman <- london_join %>%
     access_score_60_walk,
     access_score_15_cycle,
     access_score_60_cycle,
-    imd_score,
     suhii,
-    pop_density,
+    imd_score,
     age_4_and_under_pct,
     age_65_and_over_pct,
-    ethnic_minority_pct
+    ethnic_minority_pct,
+    pop_density
   ) %>%
   cor(
     use = "pairwise.complete.obs",
@@ -555,13 +426,13 @@ heatmap <- corrplot(
 )
 ```
 
-```{r, eval=FALSE}
+```{r}
 # save corrplot as png
 
 dir.create("figures", showWarnings = FALSE)
 
 png(
-  filename = "figures/Fig6_Spearman_Heatmap.png",
+  filename = "figures/Fig8_Spearman_Heatmap.png",
   width = 8.5,
   height = 5.5,
   units = "in",
@@ -584,6 +455,7 @@ dev.off()
 ```
 
 ```{r}
+# the 6 dependent variables
 dependents <- c(
   "access_score_15_pt",
   "access_score_60_pt",
@@ -593,6 +465,7 @@ dependents <- c(
   "access_score_60_cycle"
 )
 
+# check distribution of the dependent variables
 distribution_check <- do.call(
   rbind,
   lapply(dependents, function(v) {
@@ -618,17 +491,17 @@ distribution_check
 
 ### 3.1. Transform Variables
 
-**Log transform population density and standardise other variables for clean interpretation**
+**Log transform population density and standardise other variables**
 
-This is due to the above examination of data, population density is highly skewed (so, log transform) and standardise all the variables that are in percentages.
+As above examination of data, highly skewed population density needs to be log transformed and all the variables that are in percentages will be standardised.
 
 ```{r}
 model_variables <- london_join %>%
   mutate(
-    # apply log transforms
+    # log transforms pop density variable
     log_pop_density = log(pop_density), 
 
-    # standardise --> z-scores
+    # standardise variables by z-scores
     imd_z = as.numeric(scale(imd_score)),
     suhii_z = as.numeric(scale(suhii)),
     log_pop_density_z = as.numeric(scale(log_pop_density)),
@@ -640,7 +513,7 @@ model_variables <- london_join %>%
 
 ## 4. Model Choices
 
-<https://rpubs.com/Geesaale/1263990> –\> count regression: poisson or negative binomial, depending on the nature of spatial dependence of data, spatial error more suitable (spatial error models is suitable when the spatial autocorrelation is due to an underlying spatial process or unmeasured factors).
+To model geographic variation in count data, use poisson or negative binomial modelling likelihoods.
 
 ## 5. Negative Binomial GLM
 
@@ -657,7 +530,7 @@ independents <- c(
   "inner_outer_london"
 )
 
-# six dependent variables to loop over
+# dependent variables 
 dependents <- c(
   #"access_score_15_pt",
   "access_score_60_pt",
@@ -667,22 +540,22 @@ dependents <- c(
   "access_score_60_cycle"
 )
 
-# Function to fit one negative binomial GLM given an dependents name
+# fit negative binomial GLM for each dependent 
 fit_nb <- function(dependents, data, independents) {
   f <- reformulate(independents, response = dependents)
   glm.nb(f, data = data)
 }
 
-# Loop over all dependents, returning a named list of fitted models
+# loop over dependent variables 
 models_nb <- lapply(dependents, fit_nb, data = model_variables, independents = independents)
 names(models_nb) <- dependents
 ```
 
 ```{r}
-# Print a labelled summary for each of the six models
+# print summary stats of all models
 for (nm in names(models_nb)) {
   cat("\n=====================================================\n")
-  cat("MODEL:", nm, "\n")
+  cat("Negative Binomial Model:", nm, "\n")
   cat("=====================================================\n")
   print(summary(models_nb[[nm]]))
 }
@@ -691,7 +564,7 @@ for (nm in names(models_nb)) {
 ## 6. Poisson Regression
 
 ```{r}
-# The independents are the same for every model
+# independent variables to be the same for every model
 independents <- c(
   "imd_z * suhii_z",
   "log_pop_density_z",
@@ -701,7 +574,7 @@ independents <- c(
   "inner_outer_london"
 )
 
-# The six dependents to loop over
+# dependent variables
 dependents <- c(
   "access_score_15_pt",
   #"access_score_60_pt",
@@ -711,46 +584,43 @@ dependents <- c(
   #"access_score_60_cycle"
 )
 
-# Function to fit one Poisson GLM given an dependents name
+# fit poisson GLM for each dependent 
 fit_poisson <- function(dependents, data, independents) {
   f <- reformulate(independents, response = dependents)
   glm(f, data = model_variables, family = poisson(link = "log"))
 }
 
-# Loop over all dependents, returning a named list of fitted models
+# loop over dependent variables 
 models_poisson <- lapply(dependents, fit_poisson, data = model_variables, independents = independents)
 names(models_poisson) <- dependents
 ```
 
 ```{r}
+# print summary stats of all models
 for (nm in names(models_poisson)) {
   cat("\n=====================================================\n")
-  cat("MODEL:", nm, "\n")
+  cat("Poisson Model:", nm, "\n")
   cat("=====================================================\n")
   print(summary(models_poisson[[nm]]))
 }
 ```
 
 ```{r}
-# calculate Poisson dispersion
+# check Poisson dispersion
 check_dispersion <- function(model) {
-
+  # pearson chi square for Poisson residuals
   pearson_chisq <- sum(
     residuals(model, type = "pearson")^2,
     na.rm = TRUE
   )
-
   residual_df <- df.residual(model)
-
   dispersion_ratio <- pearson_chisq / residual_df
-
-  # approximate test of overdispersion
+  # approximate chi square test of overdispersion
   p_value <- pchisq(
     pearson_chisq,
     df = residual_df,
     lower.tail = FALSE
   )
-
   data.frame(
     pearson_chisq = pearson_chisq,
     residual_df = residual_df,
@@ -759,7 +629,7 @@ check_dispersion <- function(model) {
   )
 }
 
-# apply to both Poisson models
+# apply to the Poisson models
 dispersion_results <- do.call(
   rbind,
   lapply(models_poisson, check_dispersion)
@@ -808,14 +678,13 @@ coordsLSOA <- london_lsoa%>%
 ```
 
 ```{r}
-#Now we need to generate a spatial weights matrix 
-#(remember from the lecture a couple of weeks ago). 
-#We'll start with a simple binary matrix of queen's case neighbours
+# generate spatial weights matrix 
 
+# queen contiguity
 LLSOA_nb <- london_lsoa %>%
   poly2nb(., queen=T)
 
-#or nearest neighbours
+# k nearest neighbours
 knn_LSOA <-coordsLSOA %>%
   knearneigh(., k=4)
 
@@ -824,7 +693,6 @@ LLSOA_knn <- knn_LSOA %>%
 ```
 
 ```{r, eval=FALSE}
-#plot them
 plot(LLSOA_nb, st_geometry(coordsLSOA), col="red")
 ```
 
@@ -835,317 +703,174 @@ plot(LLSOA_knn, st_geometry(coordsLSOA), col="blue")
 ```{r}
 #create a spatial weights matrix object from these weights
 
+# queen contiguity spatial weight matrix
 LLSOA.queens_weight <- LLSOA_nb %>%
   nb2listw(., style="W")
 
+# k=4 nearest neighbours spatial weight matrix
 LLSOA.knn_4_weight <- LLSOA_knn %>%
   nb2listw(., style="W")
 ```
 
-### 7.1. access_score_15_pt
+### 7.1. Models VIF and Residuals
 
 ```{r}
-# name object first
-model_15_pt <- models_poisson$access_score_15_pt
-# VIF
-vif(model_15_pt)
+glm_models <- list(
+  "access_score_15_pt" = models_poisson$access_score_15_pt,
+  "access_score_60_pt" = models_nb$access_score_60_pt,
+  "access_score_15_walk" = models_poisson$access_score_15_walk,
+  "access_score_60_walk" = models_nb$access_score_60_walk,
+  "access_score_15_cycle" = models_nb$access_score_15_cycle,
+  "access_score_60_cycle" = models_nb$access_score_60_cycle
+)
 ```
 
-Ok, VIF values are all below 5 or 10, no problem with multicolinearity, next look at residuals (auto)correlation
+**VIF for each model**
 
 ```{r}
-# residuals with pearson
-model_15_pt_resids <- residuals(model_15_pt, "pearson")
+# loop and calculate VIF for each model
+glm_vif <- lapply(
+  glm_models,
+  car::vif
+)
 
-model_profile <- model_variables %>%
-  mutate(model_15_pt_resids)
-
-#now plot the residuals
-#tmap_mode("view")
-#qtm(model_profile, fill = "model_15_pt_resids")
+glm_vif
 ```
+
+**Loop for each GLM model for Pearson residuals, Queens contiguity Moran's I and KNN Moran's I**
 
 ```{r}
-# queens case
-model_15_pt_resids_queen <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_15_pt_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.queens_weight)%>%
-  tidy()
+# create function to calculate Pearson residuals
+# and test spatial autocorrelation using Moran's I
+check_glm_residuals <- function(model, model_name) {
+  
+  # calculate Pearson residuals
+  model_resids <- residuals(
+    model,
+    type = "pearson"
+  )
+  
+  # Moran's I using Queen-contiguity spatial weights (defined above)
+  moran_queen <- spdep::moran.test(
+    model_resids,
+    LLSOA.queens_weight
+  ) %>%
+    broom::tidy() %>%
+    mutate(
+      model = model_name,
+      weights = "Queen"
+    )
+  
+  # Moran's I using 4-nearest-neighbour spatial weights (defined above)
+  moran_knn <- spdep::moran.test(
+    model_resids,
+    LLSOA.knn_4_weight
+  ) %>%
+    broom::tidy() %>%
+    mutate(
+      model = model_name,
+      weights = "KNN = 4"
+    )
+  
+  # combine both results
+  bind_rows(
+    moran_queen,
+    moran_knn
+  )
+}
 
-model_15_pt_resids_queen
+
+# apply residual Moran's I tests to all six GLM models
+glm_moran_results <- bind_rows(
+  lapply(
+    names(glm_models),
+    function(model_name) {
+      check_glm_residuals(
+        glm_models[[model_name]],
+        model_name
+      )
+    }
+  )
+)
+
+glm_moran_results
 ```
+
+### 7.7. Summary of Models' residuals
 
 ```{r}
-# nearest neighbour
-model_15_pt_resids_nearest_neighbour <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_15_pt_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.knn_4_weight)%>%
-  tidy()
+# GLM Moran's I summary from above results
+# pivot it for easier read
 
-model_15_pt_resids_nearest_neighbour
+glm_morans_table <- glm_moran_results %>%
+  dplyr::select(
+    model,
+    weights,
+    estimate1,
+    p.value
+  ) %>%
+  
+  # rename values
+  dplyr::mutate(
+    model = dplyr::recode(
+      model,
+      "access_score_15_pt" = "15-minute PT",
+      "access_score_60_pt" = "60-minute PT",
+      "access_score_15_walk" = "15-minute Walking",
+      "access_score_60_walk" = "60-minute Walking",
+      "access_score_15_cycle" = "15-minute Cycling",
+      "access_score_60_cycle" = "60-minute Cycling"
+    )
+  ) %>%
+  
+  # convert Queen and KNN results into separate columns
+  tidyr::pivot_wider(
+    names_from = weights,
+    values_from = c(estimate1, p.value)
+  ) %>%
+  
+  # rename columns for reporting
+  dplyr::rename(
+    Model = model,
+    `Queens Moran's I` = estimate1_Queen,
+    `Queens p-value` = p.value_Queen,
+    `KNN = 4 Moran's I` = `estimate1_KNN = 4`,
+    `KNN = 4 p-value` = `p.value_KNN = 4`
+  )
+
+
+# format values
+glm_morans_table_report <- glm_morans_table %>%
+  dplyr::mutate(
+    `Queens Moran's I` =
+      sprintf("%.3f", `Queens Moran's I`),
+
+    `Queens p-value` =
+      format.pval(
+        `Queens p-value`,
+        digits = 3,
+        eps = 0.001
+      ),
+
+    `KNN = 4 Moran's I` =
+      sprintf("%.3f", `KNN = 4 Moran's I`),
+
+    `KNN = 4 p-value` =
+      format.pval(
+        `KNN = 4 p-value`,
+        digits = 3,
+        eps = 0.001
+      )
+  )
+
+
+# final table
+knitr::kable(
+  glm_morans_table_report,
+  align = c("l", "c", "c", "c", "c"),
+  caption = "Moran's I tests of GLM residual spatial autocorrelation"
+)
 ```
-
-### 7.2. access_score_60_pt
-
-```{r}
-# name object first
-model_60_pt <- models_nb$access_score_60_pt
-
-# VIF
-vif(model_60_pt)
-```
-
-**Residuals and Map**
-
-```{r}
-# residuals with pearson
-model_60_pt_resids <- residuals(model_60_pt, "pearson")
-
-model_profile <- model_variables %>%
-  mutate(model_60_pt_resids)
-
-#now plot the residuals
-#tmap_mode("view")
-#qtm(model_profile, fill = "model_60_pt_resids")
-```
-
-**Moran's I - Queens Case**
-
-```{r}
-# queens case
-model_60_pt_resids_queen <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_60_pt_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.queens_weight)%>%
-  tidy()
-
-model_60_pt_resids_queen
-```
-
-**Moran's I - 4 Nearest Neighbours**
-
-```{r}
-# nearest neighbour
-model_60_pt_resids_nearest_neighbour <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_60_pt_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.knn_4_weight)%>%
-  tidy()
-
-model_60_pt_resids_nearest_neighbour
-```
-
-### 7.3. access_score_15_walk (Poisson)
-
-```{r}
-# name object first
-model_15_walk <- models_poisson$access_score_15_walk
-# VIF
-vif(model_15_walk)
-```
-
-**Residuals and Map**
-
-```{r}
-# residuals with pearson
-model_15_walk_resids <- residuals(model_15_walk, "pearson")
-
-model_profile <- model_variables %>%
-  mutate(model_15_walk_resids)
-
-#now plot the residuals
-#tmap_mode("view")
-#qtm(model_profile, fill = "model_15_walk_resids")
-```
-
-**Moran's I - Queens Case**
-
-```{r}
-# queens case
-model_15_walk_resids_queen <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_15_walk_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.queens_weight)%>%
-  tidy()
-
-model_15_walk_resids_queen
-```
-
-**Moran's I - 4 Nearest Neighbours**
-
-```{r}
-# nearest neighbour
-model_15_walk_resids_nearest_neighbour <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_15_walk_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.knn_4_weight)%>%
-  tidy()
-
-model_15_walk_resids_nearest_neighbour
-```
-
-### 7.4. access_score_60_walk
-
-```{r}
-# name object first
-model_60_walk <- models_nb$access_score_60_walk
-# VIF
-vif(model_60_walk)
-```
-
-**Residuals and Map**
-
-```{r}
-# residuals with pearson 
-model_60_walk_resids <- residuals(model_60_walk, "pearson")  
-
-model_profile <- model_variables %>%   
-  mutate(model_60_walk_resids)  
-
-#now plot the residuals 
-#tmap_mode("view") 
-#qtm(model_profile, fill = "model_60_walk_resids")
-```
-
-**Moran's I - Queens Case**
-
-```{r}
-# queens case 
-model_60_walk_resids_queen <- model_profile %>%   
-  st_drop_geometry()%>%   
-  dplyr::select(model_60_walk_resids)%>%   
-  pull()%>%   
-  moran.test(., LLSOA.queens_weight)%>%   
-  tidy()  
-
-model_60_walk_resids_queen
-```
-
-**Moran's I - 4 Nearest Neighbours**
-
-```{r}
-# nearest neighbour 
-model_60_walk_resids_nearest_neighbour <- model_profile %>%   
-  st_drop_geometry()%>%   
-  dplyr::select(model_60_walk_resids)%>%   
-  pull()%>%   
-  moran.test(., LLSOA.knn_4_weight)%>%   
-  tidy()  
-
-model_60_walk_resids_nearest_neighbour
-```
-
-### 7.5. access_score_15_cycle
-
-```{r}
-# name object first
-model_15_cycle <- models_nb$access_score_15_cycle
-# VIF
-vif(model_15_cycle)
-```
-
-**Residuals and Map**
-
-```{r}
-# residuals with pearson  
-model_15_cycle_resids <- residuals(model_15_cycle, "pearson")    
-
-model_profile <- model_variables %>%      
-  mutate(model_15_cycle_resids)    
-
-#now plot the residuals  
-#tmap_mode("view")  
-#qtm(model_profile, fill = "model_15_cycle_resids")
-```
-
-**Moran's I - Queens Case**
-
-```{r}
-# queens case  
-model_15_cycle_resids_queen <- model_profile %>%      
-  st_drop_geometry()%>%      
-  dplyr::select(model_15_cycle_resids)%>%      
-  pull()%>%      
-  moran.test(., LLSOA.queens_weight)%>%      
-  tidy()    
-
-model_15_cycle_resids_queen
-```
-
-**Moran's I - 4 Nearest Neighbours**
-
-```{r}
-# nearest neighbour  
-model_15_cycle_resids_nearest_neighbour <- model_profile %>%      
-  st_drop_geometry()%>%      
-  dplyr::select(model_15_cycle_resids)%>%      
-  pull()%>%      
-  moran.test(., LLSOA.knn_4_weight)%>%      
-  tidy()    
-
-model_15_cycle_resids_nearest_neighbour
-```
-
-### 7.6. access_score_60_cycle
-
-```{r}
-# name object first
-model_60_cycle <- models_nb$access_score_60_cycle
-# VIF
-vif(model_60_cycle)
-```
-
-**Residuals and Map**
-
-```{r}
-# residuals with pearson   
-model_60_cycle_resids <- residuals(model_60_cycle, "pearson")      
-
-model_profile <- model_variables %>%         
-  mutate(model_60_cycle_resids)      
-
-#now plot the residuals   
-#tmap_mode("view")   
-#qtm(model_profile, fill = "model_60_cycle_resids")
-```
-
-**Moran's I - Queens Case**
-
-```{r}
-# queens case   
-model_60_cycle_resids_queen <- model_profile %>%         
-  st_drop_geometry()%>%         
-  dplyr::select(model_60_cycle_resids)%>%         
-  pull()%>%         
-  moran.test(., LLSOA.queens_weight)%>%         
-  tidy()      
-
-model_60_cycle_resids_queen
-```
-
-**Moran's I - 4 Nearest Neighbours**
-
-```{r}
-# nearest neighbour   
-model_60_cycle_resids_nearest_neighbour <- model_profile %>%         
-  st_drop_geometry()%>%         
-  dplyr::select(model_60_cycle_resids)%>%         
-  pull()%>%         
-  moran.test(., LLSOA.knn_4_weight)%>%         
-  tidy()      
-
-model_60_cycle_resids_nearest_neighbour
-```
-
-### 7.7. Conclusion of Models' residuals
 
 | Model          | Family            | Moran's I (Queens) | Moran's I (knn) |
 |----------------|-------------------|--------------------|-----------------|
@@ -1160,20 +885,22 @@ Strong positive spatial autocorrelation for queens case and nearest neighbours b
 
 ## 8. Global Spatial Regression model (BYM2)
 
-Given that the data type is **count data**, traditional **spatial error** models **may not be suitable** here as a direct transfer of the spatial model types for continuous data is not possible (Reference: <https://www.econstor.eu/bitstream/10419/168040/1/89655662X.pdf>).
+Given that the data type is count data, traditional spatial error models may not be suitable here ( <https://www.econstor.eu/bitstream/10419/168040/1/89655662X.pdf>).
 
 Bayesian spatial multilevel mixed-effects model incoporating BMY2 with `INLA` package
 
 ```{r}
-# https://www.r-inla.org/download/index.html
+# INLA package: https://www.r-inla.org/download/index.html
 
+# this works ocassionally:
 #install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
 
+# safer to download package with this:
 install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/testing"), dep=TRUE)
 ```
 
 ```{r}
-# reload packages (often need to restart R)
+# reload packages (if restarted R)
 library(ggplot2)
 library(tmap)
 library(cowplot)
@@ -1188,18 +915,20 @@ library(performance)
 ```
 
 ```{r}
-# check 
+# check INLA package version
 packageVersion("INLA")
 ```
 
 ```{r}
-# check INLA
-# inla.setOption(inla.mode="experimental") # if crash add this on
+# uncomment and add this if crash:
+# inla.setOption(inla.mode="experimental") 
+
+# check INLA version details
 INLA::inla.version()
 ```
 
 ```{r}
-# make a spatial model variables to be clear
+# make a spatial model variables object to be clear
 spatial_model_variables <- model_variables %>%
   dplyr::select(
     lsoa21cd,
@@ -1231,9 +960,9 @@ class(spatial_model_variables)
 ### 8.1. Spatial Neighbourhood structure
 
 ```{r}
-# from here onwards follow code from: 
+# from here onwards adapted code from: 
 # https://www.r-inla.org/examples/AlvinBong/alvinbong-example.html, a tutorial that uses count-based areal data
-# and also looked at 
+# and also:
 # https://www.sciencedirect.com/science/article/pii/S1353829225001765?via%3Dihub#sec2 --> https://github.com/mbcalles/Area-Level-Deprivation-Traffic-Injury
 
 library(INLA)
@@ -1248,7 +977,7 @@ nb <- spdep::poly2nb(
 spdep::nb2INLA("map.graph", nb)
 
 # 3. Set the location of the adjacency file for INLA
-map.adj <- file.path(getwd(), "map.graph")
+map.adj <- file.path(getwd(), "data", "map.graph")
 
 # 4. Load adjacency matrix as a graph for INLA spatial models
 g <- inla.read.graph(filename = map.adj)
@@ -1262,245 +991,96 @@ spatial_model_variables$area_id <- 1:nrow(spatial_model_variables)
 ```
 
 ```{r}
-# specify model formula
-formula_15_pt <- access_score_15_pt ~
-  imd_z * suhii_z +
-  log_pop_density_z +
-  age_4_under_z +
-  age_65_over_z +
-  ethnic_minority_z +
-  factor(inner_outer_london) +
-  f(
-    area_id,
-    model = "bym2",
-    graph = g,
-    constr = TRUE,
-    scale.model = TRUE
+# dependent variables for BYM2 
+bym2_dependents <- c(
+  "15_pt"    = "access_score_15_pt",
+  "60_pt"    = "access_score_60_pt",
+  "15_walk"  = "access_score_15_walk",
+  "60_walk"  = "access_score_60_walk",
+  "15_cycle" = "access_score_15_cycle",
+  "60_cycle" = "access_score_60_cycle"
+)
+
+
+# create function for BYM2 modelling looping for each dependent
+create_bym2_formula <- function(dependent) {
+  
+  as.formula(
+    paste0(
+      dependent,
+      " ~ ",
+      "imd_z * suhii_z + ",
+      "log_pop_density_z + ",
+      "age_4_under_z + ",
+      "age_65_over_z + ",
+      "ethnic_minority_z + ",
+      "factor(inner_outer_london) + ",
+      "f(area_id, ",
+      "model = 'bym2', ",
+      "graph = g, ",
+      "constr = TRUE, ",
+      "scale.model = TRUE)"
+    )
   )
+}
+```
 
+Having tested through all depenedent variables with negative bionomial and Poisson modelling likelihood, the final likelihood of Poisson is selected, the below will model BYM2 by Poisson likelihood:
 
-formula_60_pt <- access_score_60_pt ~
-  imd_z * suhii_z +
-  log_pop_density_z +
-  age_4_under_z +
-  age_65_over_z +
-  ethnic_minority_z +
-  factor(inner_outer_london) +
-  f(
-    area_id,
-    model = "bym2",
-    graph = g,
-    constr = TRUE,
-    scale.model = TRUE
+```{r}
+# loop BYM2 model one at a time
+for (model_name in names(bym2_dependents)) {
+  
+  # select dependent variable
+  dependent <- bym2_dependents[[model_name]]
+  
+  # create model with formula as defined above
+  model_formula <- create_bym2_formula(
+    dependent
   )
-
-
-formula_15_walk <- access_score_15_walk ~
-  imd_z * suhii_z +
-  log_pop_density_z +
-  age_4_under_z +
-  age_65_over_z +
-  ethnic_minority_z +
-  factor(inner_outer_london) +
-  f(
-    area_id,
-    model = "bym2",
-    graph = g,
-    constr = TRUE,
-    scale.model = TRUE
+  
+  # fit BYM2 Poisson model
+  model_bym2 <- INLA::inla(
+    formula = model_formula,
+    family = "poisson",
+    data = spatial_model_variables,
+    control.predictor = list(
+      compute = TRUE
+    ),
+    control.compute = list(
+      dic = TRUE,
+      waic = TRUE,
+      cpo = TRUE,
+      config = TRUE,
+      return.marginals.predictor = TRUE
+    ),
+    verbose = FALSE
   )
-
-
-formula_60_walk <- access_score_60_walk ~
-  imd_z * suhii_z +
-  log_pop_density_z +
-  age_4_under_z +
-  age_65_over_z +
-  ethnic_minority_z +
-  factor(inner_outer_london) +
-  f(
-    area_id,
-    model = "bym2",
-    graph = g,
-    constr = TRUE,
-    scale.model = TRUE
+  
+  # save as RDS
+  saveRDS(
+    model_bym2,
+    paste0(
+      "data/BYM2/model_",
+      model_name,
+      "_bym2.rds"
+    )
   )
-
-
-formula_15_cycle <- access_score_15_cycle ~
-  imd_z * suhii_z +
-  log_pop_density_z +
-  age_4_under_z +
-  age_65_over_z +
-  ethnic_minority_z +
-  factor(inner_outer_london) +
-  f(
-    area_id,
-    model = "bym2",
-    graph = g,
-    constr = TRUE,
-    scale.model = TRUE
-  )
-
-
-formula_60_cycle <- access_score_60_cycle ~
-  imd_z * suhii_z +
-  log_pop_density_z +
-  age_4_under_z +
-  age_65_over_z +
-  ethnic_minority_z +
-  factor(inner_outer_london) +
-  f(
-    area_id,
-    model = "bym2",
-    graph = g,
-    constr = TRUE,
-    scale.model = TRUE
-  )
+  
+  # remove model from memory before fitting the next dependent variable model
+  rm(model_bym2)
+  gc()
+}
 ```
 
-**15 pt**
-
-```{r}
-# run model
-model_15_pt_bym2 <- INLA::inla(
-  formula = formula_15_pt,
-  family = "poisson",
-  data = spatial_model_variables,
-  control.predictor = list(compute = TRUE),
-  # control.compute = list(return.marginals.predictor = TRUE), 
-  # https://becarioprecario.bitbucket.io/inla-gitbook/ch-spatial.html#sec:lattice 
-  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE, 
-                         return.marginals.predictor=TRUE),
-  verbose = FALSE
-)
-
-#summary(model_15_pt_bym2)
-```
-
-**60 pt**
-
-```{r}
-# run model
-model_60_pt_bym2 <- INLA::inla(
-  formula = formula_60_pt,
-  family = "poisson",
-  data = spatial_model_variables,
-  control.predictor = list(compute = TRUE),
-  #control.compute = list(return.marginals.predictor = TRUE), 
-  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE, 
-                         return.marginals.predictor=TRUE),
-  verbose = FALSE
-)
-
-#summary(model_60_pt_bym2)
-```
-
-**15 walk**
-
-```{r}
-# run model
-model_15_walk_bym2 <- INLA::inla(
-  formula = formula_15_walk,
-  family = "poisson",
-  data = spatial_model_variables,
-  control.predictor = list(compute = TRUE),
-  #control.compute = list(return.marginals.predictor = TRUE), 
-  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE, 
-                         return.marginals.predictor=TRUE), 
-  verbose = FALSE
-)
-
-#summary(model_15_walk_bym2)
-```
-
-**60 walk**
-
-```{r}
-# run model
-model_60_walk_bym2 <- INLA::inla(
-  formula = formula_60_walk,
-  family = "poisson",
-  data = spatial_model_variables, 
-  control.predictor = list(compute = TRUE),
-  #control.compute = list(return.marginals.predictor = TRUE), 
-  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE, 
-                         return.marginals.predictor=TRUE),
-  verbose = FALSE
-)
-
-#summary(model_60_walk_bym2)
-```
-
-Save as a RDS object:
-
-```{r}
-saveRDS(model_15_pt_bym2, "data/BYM2/model_15_pt_bym2.rds")
-saveRDS(model_60_pt_bym2, "data/BYM2/model_60_pt_bym2.rds")
-saveRDS(model_15_walk_bym2, "data/BYM2//model_15_walk_bym2.rds")
-saveRDS(model_60_walk_bym2, "data/BYM2/model_60_walk_bym2.rds")
-```
-
-```{r}
-# clear the bym2 memory
-rm(
-  model_15_pt_bym2,
-  model_60_pt_bym2,
-  model_15_walk_bym2,
-  model_60_walk_bym2
-)
-
-gc()
-```
-
-**15 cycle**
-
-```{r}
-# run model
-model_15_cycle_bym2 <- INLA::inla(
-  formula = formula_15_cycle,
-  family = "poisson",
-  data = spatial_model_variables, 
-  control.predictor = list(compute = TRUE),
-  #control.compute = list(return.marginals.predictor = TRUE), 
-  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE, 
-                         return.marginals.predictor=TRUE),
-  verbose = FALSE
-)
-
-#summary(model_15_cycle_bym2)
-
-# save as RDS
-saveRDS(model_15_cycle_bym2, "data/BYM2/model_15_cycle_bym2.rds")
-```
-
-**60 cycle**
-
-```{r}
-# run model
-model_60_cycle_bym2 <- INLA::inla(
-  formula = formula_60_cycle,
-  family = "poisson",
-  data = spatial_model_variables,
-  control.predictor = list(compute = TRUE),
-  #control.compute = list(return.marginals.predictor = TRUE), 
-  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE, 
-                         return.marginals.predictor=TRUE), 
-  verbose = FALSE
-)
-
-#summary(model_60_cycle_bym2)
-
-# save as RDS
-saveRDS(model_60_cycle_bym2,"data/BYM2/model_60_cycle_bym2.rds")
-```
+**Reload the RDS objects to continue the analysis**:
 
 ```{r}
 # reload
-model_15_pt_bym2    <- readRDS("data/BYM2/model_15_pt_bym2.rds")
-model_60_pt_bym2    <- readRDS("data/BYM2/model_60_pt_bym2.rds")
-model_15_walk_bym2  <- readRDS("data/BYM2/model_15_walk_bym2.rds")
-model_60_walk_bym2  <- readRDS("data/BYM2/model_60_walk_bym2.rds")
+model_15_pt_bym2 <- readRDS("data/BYM2/model_15_pt_bym2.rds")
+model_60_pt_bym2 <- readRDS("data/BYM2/model_60_pt_bym2.rds")
+model_15_walk_bym2 <- readRDS("data/BYM2/model_15_walk_bym2.rds")
+model_60_walk_bym2 <- readRDS("data/BYM2/model_60_walk_bym2.rds")
 model_15_cycle_bym2 <- readRDS("data/BYM2/model_15_cycle_bym2.rds")
 model_60_cycle_bym2 <- readRDS("data/BYM2/model_60_cycle_bym2.rds")
 ```
@@ -1559,27 +1139,28 @@ knitr::kable(
 
 ### 8.3. Validation Checks
 
-#### 8.3.1. Diagnostic 
+#### 8.3.1. Diagnostic
 
 <https://becarioprecario.bitbucket.io/inla-gitbook/ch-INLA.html#sec:modelassess>
 
 ```{r}
 # List the current six models
 six_models <- list(
-  "15 minute PT"    = model_15_pt_bym2,
-  "60 minute PT"    = model_60_pt_bym2,
-  "15 minute Walking"  = model_15_walk_bym2,
-  "60 minute Walking"  = model_60_walk_bym2,
-  "15 minute Cycling" = model_15_cycle_bym2,
-  "60 minute Cycling" = model_60_cycle_bym2
+  "15-minute PT" = model_15_pt_bym2,
+  "60-minute PT" = model_60_pt_bym2,
+  "15-minute Walking" = model_15_walk_bym2,
+  "60-minute Walking" = model_60_walk_bym2,
+  "15-minute Cycling" = model_15_cycle_bym2,
+  "60-minute Cycling" = model_60_cycle_bym2
 )
 ```
 
+**Adjusted PIT**
+
 ```{r}
 # Adjusted PIT histograms
-
 png(
-  filename = "figures/Fig_Appendix_Adjusted_PIT_Histograms.png",
+  filename = "figures/FigC1_Adjusted_PIT_Histograms.png",
   width = 2400,
   height = 1600,
   res = 300
@@ -1601,18 +1182,30 @@ for (nm in names(six_models)) {
   adjusted_pit <- m$cpo$pit[valid] -
                   0.5 * m$cpo$cpo[valid]
 
+  # histogram information without plotting
   hist(
-    adjusted_pit,
-    breaks = seq(0, 1, by = 0.05),
-    probability = TRUE,
-    main = nm,
-    xlab = "Adjusted PIT",
-    ylab = "Density",
-    xlim = c(0, 1),
-    col = "steelblue"
-  )
-
-  abline(h = 1, lty = 2)
+     adjusted_pit,
+     breaks = seq(0, 1, by = 0.05),
+     probability = TRUE,
+     main = nm,
+     xlab = "Adjusted PIT",
+     ylab = "Density",
+     xlim = c(0, 1),
+     # keep y axis consistent for all plots
+     ylim = c(0, 3),
+     yaxt = "n",  
+     col = "steelblue"
+   )
+ 
+ 
+   axis(
+     side = 2,
+     at = seq(0, 3, by = 0.5),
+     labels = sprintf("%.1f", seq(0, 3, by = 0.5))
+   )
+ 
+   # expected density under uniform PIT distribution
+   abline(h = 1, lty = 2)
 }
 
 dev.off()
@@ -1620,8 +1213,10 @@ dev.off()
 par(mfrow = c(1, 1))
 ```
 
+**DIC, WAIC, CPO, MLIK**
+
 ```{r}
-# summary of DIC, WAIC CPO and MLIK values
+# summary of DIC, WAIC, CPO and MLIK values
 model_summary <- lapply(names(six_models), function(model_name) {
 
   m <- six_models[[model_name]]
@@ -1642,36 +1237,7 @@ model_summary <- lapply(names(six_models), function(model_name) {
 model_summary
 ```
 
-```{r}
-# check if grraph nodes matches LSOAs
-
-# Number of graph nodes
-cat("Number of graph nodes:", g$n, "\n")
-cat("Number of LSOAs:", nrow(spatial_model_variables), "\n")
-
-cat(
-  "Graph and data sizes match:",
-  g$n == nrow(spatial_model_variables),
-  "\n"
-)
-
-cat(
-  "area_id is correctly ordered:",
-  identical(
-    spatial_model_variables$area_id,
-    seq_len(nrow(spatial_model_variables))
-  ),
-  "\n"
-)
-
-cat(
-  "Number of duplicated LSOA codes:",
-  anyDuplicated(spatial_model_variables$lsoa21cd),
-  "\n"
-)
-```
-
-#### 8.3.2. CPO failures
+**CPO Failures**
 
 ```{r, eval=FALSE}
 bym2_models <- list(
@@ -1712,9 +1278,40 @@ sum(log(model_15_cycle_bym2_cpo$cpo$cpo), na.rm = TRUE)
 
 Barely any changes after recompute, move on...
 
+**Queens Continguity Adjacency Graph checks**
+
+```{r}
+# check if grraph nodes matches LSOAs
+
+# Number of graph nodes
+cat("Number of graph nodes:", g$n, "\n")
+cat("Number of LSOAs:", nrow(spatial_model_variables), "\n")
+
+cat(
+  "Graph and data sizes match:",
+  g$n == nrow(spatial_model_variables),
+  "\n"
+)
+
+cat(
+  "area_id is correctly ordered:",
+  identical(
+    spatial_model_variables$area_id,
+    seq_len(nrow(spatial_model_variables))
+  ),
+  "\n"
+)
+
+cat(
+  "Number of duplicated LSOA codes:",
+  anyDuplicated(spatial_model_variables$lsoa21cd),
+  "\n"
+)
+```
+
 #### 8.3.3. Residuals
 
-Rebuild the centroids, queens, knn first
+Rebuild the centroids, queens and knn
 
 ```{r}
 # centroids 
@@ -1722,7 +1319,7 @@ coordsLSOA2 <- spatial_model_variables %>%
   st_centroid() %>% 
   st_geometry()
 
-plot(coordsLSOA2)
+#plot(coordsLSOA2)
 ```
 
 ```{r}
@@ -1739,11 +1336,12 @@ LLSOA_knn2 <- knn_LSOA2 %>%
 ```
 
 ```{r, eval=FALSE}
-#plot them
+#plot 
 plot(LLSOA_nb2, st_geometry(coordsLSOA2), col="red")
 ```
 
 ```{r, eval=FALSE}
+#plot 
 plot(LLSOA_knn, st_geometry(coordsLSOA2), col="blue")
 ```
 
@@ -1759,254 +1357,181 @@ LLSOA.knn_4_weight2 <- LLSOA_knn2 %>%
 
 **Pearson Residuals - i = (Y_i − λ̂\_i) / sqrt(λ̂\_i)**
 
-**15 pt**
-
 ```{r}
-model_15_pt_bym2_resids <- (
-  # observed minus 
-  spatial_model_variables$access_score_15_pt -
-    # fitted value
-    model_15_pt_bym2$summary.fitted.values$mean
-  # divided by square root of fitted values
-)/sqrt(model_15_pt_bym2$summary.fitted.values$mean)
-
-model_profile <- spatial_model_variables %>%
-  mutate(model_15_pt_bym2_resids)
-
-#now plot the residuals
-#tmap_mode("view")
-#qtm(model_profile, fill = "model_15_pt_bym2_resids")
+# link each BYM2 model to its corresponding dependent variable
+bym2_residual_models <- list(
+  "15_pt" = list(
+    model = model_15_pt_bym2,
+    outcome = "access_score_15_pt"
+  ),
+  "60_pt" = list(
+    model = model_60_pt_bym2,
+    outcome = "access_score_60_pt"
+  ),
+  "15_walk" = list(
+    model = model_15_walk_bym2,
+    outcome = "access_score_15_walk"
+  ),
+  "60_walk" = list(
+    model = model_60_walk_bym2,
+    outcome = "access_score_60_walk"
+  ),
+  "15_cycle" = list(
+    model = model_15_cycle_bym2,
+    outcome = "access_score_15_cycle"
+  ),
+  "60_cycle" = list(
+    model = model_60_cycle_bym2,
+    outcome = "access_score_60_cycle"
+  )
+)
 ```
 
 ```{r}
-# queens case
-model_15_pt_bym2_resids_queen <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_15_pt_bym2_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.queens_weight2)%>%
-  tidy()
-
-model_15_pt_bym2_resids_queen
+# function for BYM2 Pearson residuals
+# and test residual spatial autocorrelation by Moran's I
+check_bym2_residuals <- function(model_info, model_name) {
+  
+  model <- model_info$model
+  outcome <- model_info$outcome
+  
+  # fitted mean count for each LSOA
+  fitted_values <- model$summary.fitted.values$mean
+  
+  # calculate Pearson residuals:
+  # observed minus fitted, divided by square root of fitted
+  model_resids <- (
+    spatial_model_variables[[outcome]] -
+      fitted_values
+  ) / sqrt(fitted_values)
+  
+  # Moran's I using Queen-contiguity 
+  moran_queen <- spdep::moran.test(
+    model_resids,
+    LLSOA.queens_weight2
+  ) %>%
+    broom::tidy() %>%
+    mutate(
+      model = model_name,
+      weights = "Queen"
+    )
+  
+  # Moran's I using KNN=4
+  moran_knn <- spdep::moran.test(
+    model_resids,
+    LLSOA.knn_4_weight2
+  ) %>%
+    broom::tidy() %>%
+    mutate(
+      model = model_name,
+      weights = "KNN = 4"
+    )
+  
+  bind_rows(
+    moran_queen,
+    moran_knn
+  )
+}
 ```
 
 ```{r}
-# nearest neighbour
-model_15_pt_bym2_resids_nearest_neighbour <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_15_pt_bym2_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.knn_4_weight2)%>%
-  tidy()
+# loop for all six BYM2 models
+bym2_moran_results <- bind_rows(
+  lapply(
+    names(bym2_residual_models),
+    function(model_name) {
+      
+      check_bym2_residuals(
+        bym2_residual_models[[model_name]],
+        model_name
+      )
+    }
+  )
+)
 
-model_15_pt_bym2_resids_nearest_neighbour
+# display results
+bym2_moran_results
 ```
 
-**60 pt**
+These results showed significantly reduced compared to the GLM models, but still some spatial autocorrelation remains –\> write in discussion
 
 ```{r}
-model_60_pt_bym2_resids <- (
-  spatial_model_variables$access_score_60_pt -
-    model_60_pt_bym2$summary.fitted.values$mean
-)/sqrt(model_60_pt_bym2$summary.fitted.values$mean)
+# BYM2 Moran's I summary from above results
+# pivot it for easier read
 
-model_profile <- spatial_model_variables %>%
-  mutate(model_60_pt_bym2_resids)
+bym2_morans_table <- bym2_moran_results %>%
+  dplyr::select(
+    model,
+    weights,
+    estimate,
+    p.value
+  ) %>%
+  
+  # rename values
+  dplyr::mutate(
+    model = dplyr::recode(
+      model,
+      "15_pt" = "15-minute PT",
+      "60_pt" = "60-minute PT",
+      "15_walk" = "15-minute Walking",
+      "60_walk" = "60-minute Walking",
+      "15_cycle" = "15-minute Cycling",
+      "60_cycle" = "60-minute Cycling"
+    )
+  ) %>%
+  
+  # convert Queen and KNN results into separate columns
+  tidyr::pivot_wider(
+    names_from = weights,
+    values_from = c(estimate1, p.value)
+  ) %>%
+  
+  # rename columns for reporting
+  dplyr::rename(
+    Model = model,
+    `Queens Moran's I` = estimate1_Queen,
+    `Queens p-value` = p.value_Queen,
+    `KNN = 4 Moran's I` = `estimate1_KNN = 4`,
+    `KNN = 4 p-value` = `p.value_KNN = 4`
+  )
 
-#now plot the residuals
-#tmap_mode("view")
-#qtm(model_profile, fill = "model_60_pt_bym2_resids")
+
+# format values
+bym2_morans_table_report <- bym2_morans_table %>%
+  dplyr::mutate(
+    `Queens Moran's I` =
+      sprintf("%.3f", `Queens Moran's I`),
+
+    `Queens p-value` =
+      format.pval(
+        `Queens p-value`,
+        digits = 3,
+        eps = 0.001
+      ),
+
+    `KNN = 4 Moran's I` =
+      sprintf("%.3f", `KNN = 4 Moran's I`),
+
+    `KNN = 4 p-value` =
+      format.pval(
+        `KNN = 4 p-value`,
+        digits = 3,
+        eps = 0.001
+      )
+  )
+
+
+# final table
+knitr::kable(
+  bym2_morans_table_report,
+  align = c("l", "c", "c", "c", "c"),
+  caption = "Moran's I tests of BYM2 residual spatial autocorrelation"
+)
 ```
-
-```{r}
-# queens case
-model_60_pt_bym2_resids_queen <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_60_pt_bym2_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.queens_weight2)%>%
-  tidy()
-
-model_60_pt_bym2_resids_queen
-```
-
-```{r}
-# nearest neighbour
-model_60_pt_bym2_resids_nearest_neighbour <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_60_pt_bym2_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.knn_4_weight2)%>%
-  tidy()
-
-model_60_pt_bym2_resids_nearest_neighbour
-```
-
-**15 walk**
-
-```{r}
-model_15_walk_bym2_resids <- (
-  spatial_model_variables$access_score_15_walk -
-    model_15_walk_bym2$summary.fitted.values$mean
-)/sqrt(model_15_walk_bym2$summary.fitted.values$mean)
-
-model_profile <- spatial_model_variables %>%
-  mutate(model_15_walk_bym2_resids)
-
-#now plot the residuals
-#tmap_mode("view")
-#qtm(model_profile, fill = "model_15_walk_bym2_resids")
-```
-
-```{r}
-# queens case
-model_15_walk_bym2_resids_queen <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_15_walk_bym2_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.queens_weight2)%>%
-  tidy()
-
-model_15_walk_bym2_resids_queen
-```
-
-```{r}
-# nearest neighbour
-model_15_walk_bym2_resids_nearest_neighbour <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_15_walk_bym2_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.knn_4_weight2)%>%
-  tidy()
-
-model_15_walk_bym2_resids_nearest_neighbour
-```
-
-**60 walk**
-
-```{r}
-model_60_walk_bym2_resids <- (
-  spatial_model_variables$access_score_60_walk -
-    model_60_walk_bym2$summary.fitted.values$mean
-)/sqrt(model_60_walk_bym2$summary.fitted.values$mean)
-
-model_profile <- spatial_model_variables %>%
-  mutate(model_60_walk_bym2_resids)
-
-#now plot the residuals
-#tmap_mode("view")
-#qtm(model_profile, fill = "model_60_walk_bym2_resids")
-```
-
-```{r}
-# queens case
-model_60_walk_bym2_resids_queen <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_60_walk_bym2_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.queens_weight2)%>%
-  tidy()
-
-model_60_walk_bym2_resids_queen
-```
-
-```{r}
-# nearest neighbour
-model_60_walk_bym2_resids_nearest_neighbour <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_60_walk_bym2_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.knn_4_weight2)%>%
-  tidy()
-
-model_60_walk_bym2_resids_nearest_neighbour
-```
-
-**15 cycle**
-
-```{r}
-model_15_cycle_bym2_resids <- (
-  spatial_model_variables$access_score_15_cycle -
-    model_15_cycle_bym2$summary.fitted.values$mean
-)/sqrt(model_15_cycle_bym2$summary.fitted.values$mean)
-
-model_profile <- spatial_model_variables %>%
-  mutate(model_15_cycle_bym2_resids)
-
-#now plot the residuals
-#tmap_mode("view")
-#qtm(model_profile, fill = "model_15_cycle_bym2_resids")
-```
-
-```{r}
-# queens case
-model_15_cycle_bym2_resids_queen <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_15_cycle_bym2_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.queens_weight2)%>%
-  tidy()
-
-model_15_cycle_bym2_resids_queen
-```
-
-```{r}
-# nearest neighbour
-model_15_cycle_bym2_resids_nearest_neighbour <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_15_cycle_bym2_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.knn_4_weight2)%>%
-  tidy()
-
-model_15_cycle_bym2_resids_nearest_neighbour
-```
-
-**60 cycle**
-
-```{r}
-model_60_cycle_bym2_resids <- (
-  spatial_model_variables$access_score_60_cycle -
-    model_60_cycle_bym2$summary.fitted.values$mean
-)/sqrt(model_60_cycle_bym2$summary.fitted.values$mean)
-
-model_profile <- spatial_model_variables %>%
-  mutate(model_60_cycle_bym2_resids)
-
-#now plot the residuals
-#tmap_mode("view")
-#qtm(model_profile, fill = "model_60_cycle_bym2_resids")
-```
-
-```{r}
-# queens case
-model_60_cycle_bym2_resids_queen <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_60_cycle_bym2_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.queens_weight2)%>%
-  tidy()
-
-model_60_cycle_bym2_resids_queen
-```
-
-```{r}
-# nearest neighbour
-model_60_cycle_bym2_resids_nearest_neighbour <- model_profile %>%
-  st_drop_geometry()%>%
-  dplyr::select(model_60_cycle_bym2_resids)%>%
-  pull()%>%
-  moran.test(., LLSOA.knn_4_weight2)%>%
-  tidy()
-
-model_60_cycle_bym2_resids_nearest_neighbour
-```
-
-significantly reduced compared to the GLM models, but still some spatial autocorrelation remains –\> write in discussion
 
 ## 9. BiLISA - Bivariate LISA mapping
 
-Well known method to address issues of spatial nonstationarity, allowing geographic variations in the relationships between dependent and explanatory variables –\> use `sepdep` package
+Well known method to address issues of spatial nonstationarity, allowing geographic variations in the relationships between dependent and explanatory variables –\> use `spdep` package
 
 Each of the six dependent variables will be mapped with IMD and SUHII respectively:
 
@@ -2110,10 +1635,10 @@ bilisa_variables$bilisa_cluster_plot <- factor(
 
 
 cluster_cols <- c(
-  "Low access–High SUHII"  = "#D73027",  # red
-  "High access–High SUHII" = "#F4A582",  # light red / salmon
-  "Low access–Low SUHII"   = "#91BFDB",  # light blue
-  "High access–Low SUHII"  = "#4575B4"   # blue
+  "Low access–High SUHII"  = "#B2182B", 
+  "High access–High SUHII" = "#FDDBC7",  
+  "Low access–Low SUHII"   = "#D1E5F0",
+  "High access–Low SUHII"  = "#2166AC" 
 )
 ```
 
@@ -2121,7 +1646,6 @@ cluster_cols <- c(
 tmap_mode("plot")
 
 bilisa_15_pt_suhii_suhii_map <-
-  # Base: all LSOAs white
   tm_shape(bilisa_variables) +
   tm_fill(
     fill = "white"
@@ -2154,7 +1678,7 @@ bilisa_15_pt_suhii_suhii_map <-
   ) +
 
   tm_title(
-    "15-minute public transport accessibility\nand neighbouring SUHII"
+    "15-minute PT accessibility\nand SUHII"
   ) +
 
   tm_layout(
@@ -2245,10 +1769,10 @@ run_bilisa_map <- function(
 
   cluster_colours <- stats::setNames(
     c(
-      "#D73027",  # Low-High
-      "#F4A582",  # High-High
-      "#91BFDB",  # Low-Low
-      "#4575B4"   # High-Low
+      "#B2182B",  # Low-High
+      "#FDDBC7",  # High-High
+      "#D1E5F0",  # Low-Low
+      "#2166AC"   # High-Low
     ),
     cluster_levels
   )
@@ -2564,7 +2088,7 @@ bilisa_15_maps_combined <- cowplot::plot_grid(
   align = "hv"
 )
 
-bilisa_15_maps_combined
+#bilisa_15_maps_combined
 ```
 
 ```{r}
@@ -2578,10 +2102,10 @@ legend_labels <- c(
 )
 
 legend_colours <- c(
-  "Low access–High SUHII/IMD"  = "#D73027",
-  "High access–High SUHII/IMD" = "#F4A582",
-  "Low access–Low SUHII/IMD"   = "#91BFDB",
-  "High access–Low SUHII/IMD"  = "#4575B4"
+  "Low access–High SUHII/IMD"  = "#B2182B",
+  "High access–High SUHII/IMD" = "#FDDBC7",
+  "Low access–Low SUHII/IMD"   = "#D1E5F0",
+  "High access–Low SUHII/IMD"  = "#2166AC"
 )
 
 legend_data <- data.frame(
@@ -2676,7 +2200,7 @@ bilisa_15_final
 ```{r, eval= FALSE}
 # save as png
 ggsave(
-  filename = "figures/Fig_Appendix_BiLISA_15_min_Combined.png",
+  filename = "figures/FigD1_BiLISA_15_min_LH.png",
   plot = bilisa_15_final,
   width = 12.2,
   height = 9.5,
@@ -2707,7 +2231,7 @@ bilisa_60_maps_combined <- cowplot::plot_grid(
   align = "hv"
 )
 
-bilisa_60_maps_combined
+#bilisa_60_maps_combined
 ```
 
 ```{r}
@@ -2752,7 +2276,7 @@ bilisa_60_final
 
 ```{r, eval=FALSE}
 ggsave(
-  filename = "figures/Fig_Appendix_BiLISA_60_min_Combined.png",
+  filename = "figures/FigD2_BiLISA_60_min_LH.png",
   plot = bilisa_60_final,
   width = 12.2,
   height = 9.5,
@@ -2964,10 +2488,10 @@ two_combined_15_cycle <- create_priority_two_combined(
 ```{r}
 # Colours for the two_combined classification
 two_combined_colours <- c(
-  "High SUHII and IMD" = "#7F0000",
-  "High SUHII" = "#D73027",
-  "High IMD" = "#F4A582",
-  "Not Significant" = "grey95"
+  "High SUHII and IMD" = "#5F2022",
+  "High SUHII"         = "#AD423B",
+  "High IMD"           = "#DC9179",
+  "Not Significant"    = "#FBF8F2"
 )
 
 
@@ -3095,7 +2619,7 @@ two_combined_15_final <- cowplot::ggdraw() +
   cowplot::draw_label(
     paste0(
       "15-minute BiLISA Clusters of\n",
-      "Low-Accessibility–High SUHII and/or High IMD"
+      "Low Accessibility–High SUHII and/or High IMD"
     ),
     x = 0.5,
     y = 0.98,
@@ -3226,7 +2750,7 @@ two_combined_60_final
 ```{r, eval=FALSE}
 # save as PNG
 ggsave(
-  filename = "figures/Fig13_BiLISA_60_min_Combined.png",
+  filename = "figures/Fig14_BiLISA_60_min_LH_Combined.png",
   plot = two_combined_60_final,
   width = 9,
   height = 11,
