@@ -31,7 +31,7 @@ The code scripts are structured in the order in which the analysis was performed
 `1_Data_Preparation.Rmd` pre-processes and filter datasets to the Greater London study area, including conversion of GTFS data using `UK2GTFS`. The study area is visualised in `1a_Map_Study_Area.Rmd`. 
 
 ### 2. Land Surface Temperature (LST) and Quantify Urban Heat
-`2_GoogleEarthEngine_LST_Quantify_Urban_Heat.txt` processes Landsat-9 LST data, derives London-level and LSOA-level LST and surface urban heat intensity to quantify urban heat exposure. The corresponding visualisations are in `2a_Map_LST_and_SUHII.Rmd`
+`2_GoogleEarthEngine_LST_Quantify_Urban_Heat.txt` processes Landsat-9 LST data for London-level and LSOA-level LST to quantify urban heat exposure with surface urban heat intensity. The corresponding visualisations are in `2a_Map_LST_and_SUHII.Rmd`
 
 
 ### 3. Urban Green Space and Buffer LST 
