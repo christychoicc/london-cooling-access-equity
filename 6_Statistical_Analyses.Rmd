@@ -505,7 +505,7 @@ To model geographic variation in count data, use poisson or negative binomial mo
 ### 5.1. Negative Binomial
 
 ```{r}
-# independent variables to be the same for every model
+# independent variables
 independents <- c(
   "imd_z * suhii_z",
   "log_pop_density_z",
@@ -549,7 +549,7 @@ for (nm in names(models_nb)) {
 ### 5.2. Poisson
 
 ```{r}
-# independent variables to be the same for every model
+# independent variables
 independents <- c(
   "imd_z * suhii_z",
   "log_pop_density_z",
@@ -665,7 +665,7 @@ LLSOA.knn_4_weight <- LLSOA_knn %>%
 #### 5.3.1. Models VIF and Residuals
 
 ```{r}
-# name the models
+# list the models
 glm_models <- list(
   "access_score_15_pt" = models_poisson$access_score_15_pt,
   "access_score_60_pt" = models_nb$access_score_60_pt,
@@ -701,7 +701,7 @@ check_glm_residuals <- function(model, model_name) {
     type = "pearson"
   )
   
-  # Moran's I using Queen-contiguity spatial weights as defined above
+  # Moran's I using Queen contiguity spatial weights as defined above
   moran_queen <- spdep::moran.test(
     model_resids,
     LLSOA.queens_weight
@@ -772,7 +772,7 @@ glm_morans_table <- glm_moran_results %>%
     )
   ) %>%
   
-  # convert Queen and KNN results into separate columns
+  # Queen and KNN results into separate columns
   tidyr::pivot_wider(
     names_from = weights,
     values_from = c(estimate1, p.value)
@@ -788,7 +788,7 @@ glm_morans_table <- glm_moran_results %>%
   )
 
 
-# format Moron's I and p-values
+# format Moran's I and p-values
 glm_morans_table_report <- glm_morans_table %>%
    dplyr::mutate(
     `Queens Moran's I` =
@@ -854,7 +854,7 @@ INLA::inla.version()
 ```
 
 ```{r}
-# make a spatial model variables object to be clear
+# make a spatial model variables object
 spatial_model_variables <- model_variables %>%
   dplyr::select(
     lsoa21cd,
@@ -969,6 +969,7 @@ for (model_name in names(bym2_dependents)) {
     control.predictor = list(
       compute = TRUE
     ),
+    # also compute DIC, WAIC, CPO
     control.compute = list(
       dic = TRUE,
       waic = TRUE,
@@ -1127,7 +1128,7 @@ for (nm in names(six_models)) {
      labels = sprintf("%.1f", seq(0, 3, by = 0.5))
    )
  
-   # expected density under uniform PIT distribution
+   # uniform PIT distribution line
    abline(h = 1, lty = 2)
 }
 
@@ -1143,8 +1144,8 @@ par(mfrow = c(1, 1))
 model_summary <- lapply(names(six_models), function(model_name) {
 
   m <- six_models[[model_name]]
+  # use valid CPOs
   valid_cpo <- is.finite(m$cpo$cpo) & m$cpo$cpo > 0
-
   data.frame(
     Model = model_name,
     DIC = m$dic$dic,
@@ -1165,17 +1166,8 @@ model_summary
 Only a very tiny change after recomputing, skip to next.
 
 ```{r, eval=FALSE}
-bym2_models <- list(
-  "15-minute Public Transit" = model_15_pt_bym2,
-  "60-minute Public Transit" = model_60_pt_bym2,
-  "15-minute Walking" = model_15_walk_bym2,
-  "60-minute Walking" = model_60_walk_bym2,
-  "15-minute Cycling" = model_15_cycle_bym2,
-  "60-minute Cycling" = model_60_cycle_bym2
-)
-
 cpo_failure_counts <- sapply(
-  bym2_models,
+  six_models,
   function(model) sum(model$cpo$failure > 0, na.rm = TRUE)
 )
 
@@ -1312,11 +1304,12 @@ check_bym2_residuals <- function(model_info, model_name) {
   # fitted mean count for each LSOA
   fitted_values <- model$summary.fitted.values$mean
   
-  # Pearson 
-  # pearson residuals need: observed minus fitted and divided by square root of fitted
+  # Pearson residuals
+  # calculate as the model are INLA models
+  # pearson residuals --> observed minus fitted and divided by square root of fitted
   model_resids <- (spatial_model_variables[[outcome]] - fitted_values) / sqrt(fitted_values)
   
-  # Moran's I using Queen-contiguity 
+  # Moran's I using Queen contiguity 
   moran_queen <- spdep::moran.test(
     model_resids,
     LLSOA.queens_weight2
@@ -1388,7 +1381,7 @@ bym2_morans_table <- bym2_moran_results %>%
     )
   ) %>%
   
-  # convert Queen and KNN results into separate columns
+  # Queen and KNN results into separate columns
   tidyr::pivot_wider(
     names_from = weights,
     values_from = c(estimate1, p.value)
@@ -1404,7 +1397,7 @@ bym2_morans_table <- bym2_moran_results %>%
   )
 
 
-# format Moron's I and p-values
+# format Moran's I and p-values
 bym2_morans_table_report <- bym2_morans_table %>%
   dplyr::mutate(
     `Queens Moran's I` =
@@ -1447,7 +1440,7 @@ use `spdep` package
 bilisa_variables <- spatial_model_variables %>%
   arrange(lsoa21cd)
 
-# Create Queen-contiguity neighbours
+# Create Queen contiguity neighbours
 bilisa_nb <- bilisa_variables %>%
   poly2nb(.,queen = T)
 
@@ -1560,7 +1553,7 @@ run_bilisa_map <- function(
       bilisa_cluster = as.character(
         lisa_cluster
       ),
-      # use names defined above
+      # replace with names defined above
       bilisa_cluster_plot = unname(
         cluster_labels[bilisa_cluster]
       ),
@@ -2037,7 +2030,7 @@ create_priority_two_combined <- function(suhii_object, imd_object) {
       lsoa21cd,
       suhii_cluster = bilisa_cluster
     ) %>%
-    # Join IMD BiLISA clusters by LSOA code
+    # join IMD BiLISA clusters by LSOA code
     dplyr::left_join(
       imd_object$data %>%
         sf::st_drop_geometry() %>%
@@ -2048,7 +2041,7 @@ create_priority_two_combined <- function(suhii_object, imd_object) {
       by = "lsoa21cd"
     ) %>%
 
-    # Identify whether each LSOA belongs to either or both Low access–High SUHII / IMD
+    # identify whether each LSOA belongs to one of or both Low access–High SUHII / IMD
     dplyr::mutate(
       two_combined_class = dplyr::case_when(
 
@@ -2124,9 +2117,8 @@ combined_access_names <- c(
 )
 
 
-# create combined SUHII / IMD clusters and map
+# create combined SUHII / IMD clusters for each accessibility 
 for (access_name in combined_access_names) {
-
   # take SUHII BiLISA 
   suhii_object <- get(
     paste0(
@@ -2135,7 +2127,6 @@ for (access_name in combined_access_names) {
       "_suhii"
     )
   )
-
   # take IMD BiLISA
   imd_object <- get(
     paste0(
@@ -2144,14 +2135,13 @@ for (access_name in combined_access_names) {
       "_imd"
     )
   )
-
   # combine Low-High SUHII and IMD 
   combined_result <- create_priority_two_combined(
     suhii_object = suhii_object,
     imd_object = imd_object
   )
 
-  # keep original combined result object name
+  # combined results with the accessibility name
   assign(
     paste0(
       "two_combined_",
@@ -2165,7 +2155,7 @@ for (access_name in combined_access_names) {
     combined_result
   )
 
-  # keep original map object name
+  # object name
   assign(
     paste0(
       "two_combined_",

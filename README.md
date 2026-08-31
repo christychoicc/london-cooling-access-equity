@@ -3,7 +3,7 @@
 ## Overview
 This repository contains the code used for the dissertation submitted in part requirement for the MSc in the Centre for Advanced Spatial Analysis, Bartlett Faculty of the Built Environment, UCL. 
 
-This study sets out to answer the following question: *To what extent is multimodal accessibility to cooling-effective urban green spaces equitably distributed across heat exposed and socioeconomically deprived areas in London?* The following sections describe the reproducible workflow from data preparation, quantification of urban heat and park cooling, multimodal accessibility modelling, and statistical and spatial analyses to assess equity. 
+This study sets out to answer the following question: *To what extent is multimodal accessibility to cooling-effective urban green spaces equitably distributed across heat exposed and socioeconomically deprived areas in London?* The following sections describe the reproducible workflow from data preparation, quantification of urban heat and park cooling, multimodal accessibility modelling, and statistical analyses to assess equity. 
 
 ## Repository Structure
 ```
@@ -28,10 +28,10 @@ london-cooling-access-equity/
 The code scripts are structured in the order in which the analysis was performed. Note: `2_GoogleEarthEngine_LST_Quantify_Urban_Heat.txt` and `3_GoogleEarthEngine_Greenspace_Buffer_LST.txt` are to be processed via the [Google Earth Engine Code Editor](https://code.earthengine.google.com/)
 
 ### 1. Data Preparation
-`1_Data_Preparation.Rmd` pre-processes and filter datasets to the Greater London study area, including conversion of GTFS data using `UK2GTFS`. The study area is visualised in `1a_Map_Study_Area.Rmd`. 
+`1_Data_Preparation.Rmd` pre-processes and filter datasets to the Greater London study area, including GTFS conversion using `UK2GTFS`. The study area is visualised in `1a_Map_Study_Area.Rmd`. 
 
 ### 2. Land Surface Temperature (LST) and Quantify Urban Heat
-`2_GoogleEarthEngine_LST_Quantify_Urban_Heat.txt` processes Landsat-9 LST data for London-level and LSOA-level LST to quantify urban heat exposure with surface urban heat intensity. The corresponding visualisations are in `2a_Map_LST_and_SUHII.Rmd`
+`2_GoogleEarthEngine_LST_Quantify_Urban_Heat.txt` processes Landsat-9 LST data for London- and LSOA-level LST to quantify urban heat exposure with surface urban heat intensity. The corresponding visualisations are in `2a_Map_LST_and_SUHII.Rmd`
 
 
 ### 3. Urban Green Space and Buffer LST 
@@ -44,7 +44,7 @@ The code scripts are structured in the order in which the analysis was performed
 `5_Multimodal_Accessibility_r5r.Rmd` computes multimodal travel time matrices and accessibility indicators to cooling-effective urban green spaces using `r5r`, with corresponding visualisations in `5a_Map_Travel_Time_Cumulative_Accessibility.Rmd`.
 
 ### 6. Statistical Analyses
-`6_Statistical_Analyses.Rmd` performs statistical analyses for this study, including GLM regression, BYM2 spatial regression modelling and BiLISA analysis to assess equity. 
+`6_Statistical_Analyses.Rmd` performs statistical analyses for this study, including GLM regression, BYM2 spatial regression and BiLISA analysis to assess equity. 
 
 
 ## Software Requirements
@@ -56,7 +56,7 @@ The analysis was performed using R and Google Earth Engine. Key R-packages used 
 Large data files exceeding GitHub's recommended file size limits (50 MB) are not included in this repository.
 
 The full project data can be downloaded here: [Download Project Data](https://liveuclac-my.sharepoint.com/:f:/r/personal/ucfncc0_ucl_ac_uk/Documents/data?d=wdf9102e4c20d400e956e7c03bff41fd0&csf=1&web=1&e=ZZgeIa),
-or obtained directly from the below [Data Sources](https://github.com/christychoicc/london-cooling-access-equity#data-sources) section. The *data/* directory is structured as follows:  
+or obtained directly from the below section: [Data Sources](https://github.com/christychoicc/london-cooling-access-equity#data-sources) section. The *data/* directory is structured as follows:  
 
 ```
 data/
@@ -85,12 +85,12 @@ data/
 ```
 
 ### Data Sources
-Original sources of data used to produce this study are listed below: 
+Original datasets used to produce this study are listed below: 
 |Dataset|Reference|
 |---|---|
 |Greater London Boundary|[Greater London Authority (2018)](https://data.london.gov.uk/dataset/statistical-gis-boundary-files-for-london-20od9/)|
 |Lower layer Super Output Areas (December 2021) EW|[Office for National Statistics (2024)](https://geoportal.statistics.gov.uk/datasets/2bbaef5230694f3abae4f9145a3a9800_0/explore?location=52.837550%2C-2.489483%2C6)|
-|Landsat 9 Collection 2 Level 2|[Earth Resources Observation and Science (EROS) Center. (2020)](https://developers.google.com/earth-engine/datasets/catalog/LANDSAT_LC08_C02_T1_L2)|
+|Landsat 9 Collection 2 Level 2|[Earth Resources Observation and Science (EROS) Center. (2020)](https://developers.google.com/earth-engine/datasets/catalog/LANDSAT_LC09_C02_T1_L2)|
 |OS Open Greenspace|[Ordnance Survey (2026)](https://www.ordnancesurvey.co.uk/products/os-open-greenspace)|
 |OpenStreetMap, Greater London|[Geofabrik and OSM Contributors (2025)](https://download.geofabrik.de/europe/united-kingdom/england/greater-london.html)|
 |Bus Open Data Service|[Department for Transport (2026)](https://data.bus-data.dft.gov.uk/timetable/download/)|
