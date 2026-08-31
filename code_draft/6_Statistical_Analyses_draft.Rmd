@@ -1,0 +1,3665 @@
+---
+title: "6_Statistical_Analyses"
+---
+
+This markdown file is the first draft script used for the complete analysis of `6_Statistical_Analyses.Rmd`, the final cleaned tidied version is under the project directory.
+
+Spatial tools: <https://doc.esri.com/en/arcgis-pro/latest/tool-reference/spatial-statistics/an-overview-of-the-modeling-spatial-relationships-toolset.html>
+
+```{r}
+# remove objects from R environment and clear memory
+rm(list = ls())    
+gc()
+```
+
+## Load Packages
+
+```{r}
+library(sf)
+library(sp)
+library(readr)
+library(dplyr)
+library(knitr)
+library(tidyr)
+library(tibble)
+library(tidyverse)
+library(tmap)
+library(cowplot)
+library(plotly)
+library(corrplot)
+library(broom)
+library(mapview)
+library(stringr)
+library(spdep)
+library(car)
+library(fs)
+library(janitor)
+library(GGally)
+library(MASS)
+library(spatialreg)
+library(INLA)
+library(INLAtools)
+library(performance)
+```
+
+## Data Loading
+
+Clean names, select initial needed columns and rename columns for consistency across datasets
+
+**Greater London Boundary:**
+
+```{r}
+london_boundary <- st_read("data/gla/London_GLA_Boundary.shp")
+```
+
+**London only LSOAs**
+
+```{r}
+london_lsoa <- st_read("data/lsoa_london/lsoa_london.shp")
+```
+
+**Data obtained from previous pre-processing**
+
+```{r}
+# travel time 
+multimodal_accessibility_lsoa <- st_read("data/multimodal_accessibility_lsoa.gpkg")%>%
+  clean_names()%>%
+  dplyr::select(
+    lsoa21cd,
+    lsoa21nm,
+    access_score_15_pt,
+    access_score_60_pt,
+    access_score_15_walk,
+    access_score_60_walk,
+    access_score_15_cycle,
+    access_score_60_cycle,
+    travel_time_min_pt,
+    travel_time_min_walk,
+    travel_time_min_cycle,
+    geom
+  )%>%
+  rename(
+    geometry = geom
+  )
+```
+
+```{r}
+# SUHII as lsoa heat exposure
+suhii_lsoa <- st_read("data/London_LSOA_LST_SUHI/London_LSOA_LST_SUHI.shp")%>% 
+  st_transform(.,27700)%>%
+  clean_names()%>%
+  dplyr::select(
+    lsoa21cd,
+    lsoa21nm,
+    # mean LST per LSOA
+    mean,
+    # london mean LST
+    london_mea,
+    # SUHII equivalent
+    lst_differ,
+    geometry
+  )%>%
+  # rename column names which were cut short from GEE export
+  rename(
+    mean_lst_lsoa = mean,
+    london_mean = london_mea,
+    suhii = lst_differ
+  )
+```
+
+**IMD 2025 data**
+
+```{r}
+# IMD score
+imd_score <- read_csv("data/IMD_2025.csv")%>%
+  clean_names()%>%
+  dplyr::select(
+    lsoa_code_2021,
+    lsoa_name_2021,
+    index_of_multiple_deprivation_imd_score
+    )%>%
+  rename(
+    lsoa21cd = lsoa_code_2021,
+    lsoa21nm = lsoa_name_2021,
+    imd_score = index_of_multiple_deprivation_imd_score
+  )
+```
+
+**Census Data**
+
+```{r}
+# TS006 population density
+census_pop_density <- read_csv("data/census2021/census2021-ts006-lsoa.csv")%>%
+  clean_names()%>%
+  dplyr::select(
+    geography,
+    geography_code,
+    population_density_persons_per_square_kilometre_measures_value
+  )%>%
+  rename(
+    lsoa21cd = geography_code,
+    lsoa21nm = geography,
+    pop_density = population_density_persons_per_square_kilometre_measures_value
+  )
+```
+
+```{r}
+# TS007a age by 5 year band
+census_age_5year_band <- read_csv("data/census2021/census2021-ts007a-lsoa.csv")%>%
+  clean_names()%>%
+  dplyr::select(
+    geography,
+    geography_code,
+    age_total,
+    age_aged_4_years_and_under,
+    # for filter for age 65 or over 
+    age_aged_65_to_69_years,
+    age_aged_70_to_74_years,
+    age_aged_75_to_79_years,
+    age_aged_80_to_84_years,
+    age_aged_85_years_and_over
+  )%>%
+  rename(
+    lsoa21cd = geography_code,
+    lsoa21nm = geography,
+    age_4_and_under = age_aged_4_years_and_under,
+    age_65_to_69 = age_aged_65_to_69_years,
+    age_70_to_74 = age_aged_70_to_74_years,
+    age_75_to_79 = age_aged_75_to_79_years,
+    age_80_to_84 = age_aged_80_to_84_years,
+    age_85_and_over = age_aged_85_years_and_over
+  )
+```
+
+```{r, eval=FALSE}
+# TS038 disability
+census_disability <- read_csv("data/census2021/census2021-ts038-lsoa.csv")%>%
+  clean_names()%>%
+  select(
+    geography,
+    geography_code,
+    disability_total_all_usual_residents,
+    disability_disabled_under_the_equality_act
+  )%>%
+  rename(
+    lsoa21cd = geography_code,
+    lsoa21nm = geography,
+    # total number of residents 
+    disability_total_residents = disability_total_all_usual_residents,
+    # disabled under the Equality Act 2010
+    disabled = disability_disabled_under_the_equality_act
+  )
+```
+
+```{r, eval=FALSE}
+# TS037 general health
+census_health <- read_csv("data/census2021/census2021-ts037-lsoa.csv")%>% 
+  clean_names()%>%
+  select(
+    geography,
+    geography_code,
+    general_health_total_all_usual_residents,
+    general_health_bad_health,
+    general_health_very_bad_health
+  )%>%
+  rename(
+    lsoa21cd = geography_code,
+    lsoa21nm = geography,
+    general_health_total_residents = general_health_total_all_usual_residents,
+    general_health_bad = general_health_bad_health,
+    general_health_very_bad = general_health_very_bad_health
+  )
+```
+
+```{r}
+# TS021 Ethnicity
+# definition of ethnic minority groups
+# https://www.ethnicity-facts-figures.service.gov.uk/style-guide/writing-about-ethnicity/ 
+# https://service-manual.ons.gov.uk/content/language/ethnicity-and-race
+census_ethnicity <- read_csv("data/census2021/census2021-ts021-lsoa.csv")%>%
+  clean_names()%>%
+  dplyr::select(
+    geography,
+    geography_code,
+    ethnic_group_total_all_usual_residents,
+    # Use “Ethnic minorities” to refer to all ethnic groups except the White British group
+    ethnic_group_white_english_welsh_scottish_northern_irish_or_british
+  )%>%
+  rename(
+    lsoa21cd = geography_code,
+    lsoa21nm = geography,
+    ethnic_group_total_residents = ethnic_group_total_all_usual_residents,
+    white_british_group = ethnic_group_white_english_welsh_scottish_northern_irish_or_british
+  )
+```
+
+## 1. Data Cleaning
+
+### Check Loaded + Initial Cleaned Data Column Names
+
+```{r}
+names(london_lsoa)
+```
+
+```{r}
+# check 3 modes 
+names(multimodal_accessibility_lsoa)
+```
+
+```{r}
+# check names in SUHII export
+names(suhii_lsoa)
+```
+
+```{r}
+# check IMD names
+names(imd_score)
+```
+
+```{r}
+# check census data
+names(census_pop_density)
+```
+
+```{r}
+names(census_age_5year_band)
+```
+
+```{r}
+names(census_ethnicity)
+```
+
+### Wrangle data variables for regression modelling
+
+```{r}
+# filter for london lsoas only
+london_lsoa_codes <- london_lsoa %>%
+  clean_names() %>%
+  pull(lsoa21cd)
+```
+
+```{r}
+# create percentage variables for age 4 and under and age 65 and over
+census_age_cleaned <- census_age_5year_band %>%
+  mutate(
+    # create % of age 4 and under
+    # calculate percentage
+    age_4_and_under_pct = ifelse(
+      age_total > 0,
+      (age_4_and_under / age_total) * 100,
+      NA
+    ),
+    # create % of age 65 and over
+    age_65_and_over = rowSums(
+      across(
+        # sum up 65 to 85 and over
+        c(
+          age_65_to_69,
+          age_70_to_74,
+          age_75_to_79,
+          age_80_to_84,
+          age_85_and_over
+        )
+      ),
+      na.rm = TRUE
+    ),
+    # calculate percentage
+    age_65_and_over_pct = ifelse(
+      age_total > 0,
+      (age_65_and_over / age_total)* 100,
+      NA
+    )
+  )%>% 
+  # keep the ones that are within london lsoas only
+  filter(lsoa21cd %in% london_lsoa_codes)
+```
+
+```{r}
+# create ethnic minority group variable
+census_ethnicity_cleaned <- census_ethnicity %>%
+   mutate(
+     # everything else but white british group - defined by ONS
+    ethnic_minority =
+      ethnic_group_total_residents - white_british_group,
+    # calculate percentage
+    ethnic_minority_pct = ifelse(
+      ethnic_group_total_residents > 0,
+      (ethnic_minority / ethnic_group_total_residents) * 100,
+      NA
+    )
+  )%>% 
+  # keep the ones that are within london lsoas only
+  filter(lsoa21cd %in% london_lsoa_codes)
+```
+
+```{r}
+# imd score variable 
+# filter for london lsoas only
+imd_score_cleaned <- imd_score %>% 
+  filter(lsoa21cd %in% london_lsoa_codes)
+```
+
+### Join Data
+
+```{r}
+# join data
+london_join <- multimodal_accessibility_lsoa %>%
+  # SUHII 
+  left_join(
+    suhii_lsoa %>%
+      # drop geom cus multimodal travel time already have it
+      st_drop_geometry() %>%
+      # select needed columns
+      dplyr::select(lsoa21cd, suhii),
+    # join by lsoa code
+    by = "lsoa21cd"
+  ) %>%
+  
+  # IMD 
+  left_join(
+    imd_score_cleaned %>%
+      dplyr::select(lsoa21cd, imd_score),
+    by = "lsoa21cd"
+  ) %>%
+  
+  # population density
+  left_join(
+    census_pop_density %>%
+      dplyr::select(lsoa21cd, pop_density),
+    by = "lsoa21cd"
+  ) %>%
+  
+  # age
+  left_join(
+    census_age_cleaned %>%
+      dplyr::select(lsoa21cd, age_4_and_under_pct, age_65_and_over_pct),
+    by = "lsoa21cd"
+  ) %>%
+  
+  # ethnicity
+  left_join(
+    census_ethnicity_cleaned %>%
+      dplyr::select(lsoa21cd, ethnic_minority_pct),
+    by = "lsoa21cd"
+  )
+```
+
+**Add an additional Inner and Outer London control + join to data**
+
+```{r}
+# create inner london control variable
+# following: https://www.london.gov.uk/programmes-strategies/planning/london-plan/the-london-plan-2021-online/annex-2-inner-and-outer-london-boroughs
+inner_london_boroughs <- c(
+  "City of London", "Camden", "Greenwich", "Hackney",
+  "Hammersmith and Fulham", "Islington", "Kensington and Chelsea",
+  "Lambeth", "Lewisham", "Newham", "Southwark", "Tower Hamlets",
+  "Wandsworth", "Westminster"
+)
+
+london_join <- london_join %>%
+  mutate(
+    #remove the letters numbers behind borough names to keep it a clean borough name only
+    borough = str_remove(lsoa21nm, "\\s\\d+[A-Z]$"),
+    # inner and outer london categories
+    inner_outer_london = if_else(borough %in% inner_london_boroughs, "Inner", "Outer"),
+    inner_outer_london = factor(inner_outer_london, levels = c("Outer", "Inner"))
+  )
+```
+
+```{r}
+#check fully joined data
+names(london_join)
+```
+
+## 2. Check Data for Regression
+
+```{r}
+# check data types
+check_data <- london_join %>%
+  st_drop_geometry() %>%
+  summarise(across(everything(), ~class(.)[1])) %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "type")
+
+view(check_data)
+```
+
+```{r}
+# descriptive stats
+london_join %>%
+  st_drop_geometry() %>%
+  dplyr::select(where(is.numeric)) %>%
+  summarise(across(everything(),
+                   list(mean = ~mean(., na.rm = TRUE),
+                        sd = ~sd(., na.rm = TRUE),
+                        min = ~min(., na.rm = TRUE),
+                        max = ~max(., na.rm = TRUE)))) %>%
+  pivot_longer(everything(),
+               names_to = c("variable", "stat"),
+               names_pattern = "(.*)_(mean|sd|min|max)") %>%
+  pivot_wider(names_from = stat, values_from = value) %>%
+  kable(digits = 2)
+```
+
+## 3. Exploratory Data Analysis
+
+**Plot Variables Distribution**
+
+```{r}
+# Select only numeric columns
+numeric_cols <- london_join %>%
+  sf::st_drop_geometry() %>%
+  dplyr::select(where(is.numeric))
+
+# Convert to long format for faceting
+numeric_long <- numeric_cols %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value")
+
+# Plot faceted histograms
+variables_dist_hist <- ggplot(numeric_long, aes(x = value)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  facet_wrap(~ variable, scales = "free", ncol = 3) +
+  theme_minimal() +
+  labs(title = "Histograms of Numerical Variables")
+
+#variables_dist_hist
+```
+
+**Plot Heatmap Correlation (Spearman)**
+
+```{r}
+# Select only the numeric variables (drop codes, names, geometry)
+corr_matrix_spearman <- london_join %>%
+  st_drop_geometry() %>%
+  dplyr::select(
+    access_score_15_pt,
+    access_score_60_pt,
+    access_score_15_walk,
+    access_score_60_walk,
+    access_score_15_cycle,
+    access_score_60_cycle,
+    suhii,
+    imd_score,
+    age_4_and_under_pct,
+    age_65_and_over_pct,
+    ethnic_minority_pct,
+    pop_density
+  ) %>%
+  cor(
+    use = "pairwise.complete.obs",
+    method = "spearman"
+  )
+
+heatmap <- corrplot(
+  corr_matrix_spearman,
+  method = "color",
+  type = "full",
+  col = rev(COL2("RdBu", 200)),
+  tl.col = "black",
+  tl.srt = 45,
+  addCoef.col = "black",
+  number.cex = 0.6
+)
+```
+
+```{r}
+# save corrplot as png
+
+dir.create("figures", showWarnings = FALSE)
+
+png(
+  filename = "figures/Fig8_Spearman_Heatmap.png",
+  width = 8.5,
+  height = 5.5,
+  units = "in",
+  res = 300,
+  bg = "white"
+)
+
+corrplot(
+  corr_matrix_spearman,
+  method = "color",
+  type = "full",
+  col = rev(COL2("RdBu", 200)),
+  tl.col = "black",
+  tl.srt = 45,
+  addCoef.col = "black",
+  number.cex = 0.6
+)
+
+dev.off()
+```
+
+```{r}
+dependents <- c(
+  "access_score_15_pt",
+  "access_score_60_pt",
+  "access_score_15_walk",
+  "access_score_60_walk",
+  "access_score_15_cycle",
+  "access_score_60_cycle"
+)
+
+distribution_check <- do.call(
+  rbind,
+  lapply(dependents, function(v) {
+
+    y <- london_join[[v]]
+
+    data.frame(
+      dependents = v,
+      n = sum(!is.na(y)),
+      mean = mean(y, na.rm = TRUE),
+      variance = var(y, na.rm = TRUE),
+      variance_mean_ratio = var(y, na.rm = TRUE) /
+        mean(y, na.rm = TRUE),
+      zeros = sum(y == 0, na.rm = TRUE),
+      zero_percent = mean(y == 0, na.rm = TRUE) * 100,
+      maximum = max(y, na.rm = TRUE)
+    )
+  })
+)
+
+distribution_check
+```
+
+### 3.1. Transform Variables
+
+**Log transform population density and standardise other variables**
+
+As above examination of data, highly skewed population density needs to be log transformed and all the variables that are in percentages will be standardised.
+
+```{r}
+model_variables <- london_join %>%
+  mutate(
+    # log transforms pop density variable
+    log_pop_density = log(pop_density), 
+
+    # standardise variables by z-scores
+    imd_z = as.numeric(scale(imd_score)),
+    suhii_z = as.numeric(scale(suhii)),
+    log_pop_density_z = as.numeric(scale(log_pop_density)),
+    age_4_under_z = as.numeric(scale(age_4_and_under_pct)),
+    age_65_over_z = as.numeric(scale(age_65_and_over_pct)),
+    ethnic_minority_z  = as.numeric(scale(ethnic_minority_pct))
+  )
+```
+
+## 4. Model Choices
+
+<https://rpubs.com/Geesaale/1263990> –\> count regression: poisson or negative binomial, allow modelling of geographic variation in count data
+
+## 5. Negative Binomial GLM
+
+Loop all models:
+
+```{r}
+# independent variables to be the same for every model
+independents <- c(
+  "imd_z * suhii_z",
+  "log_pop_density_z",
+  "age_4_under_z",
+  "age_65_over_z",
+  "ethnic_minority_z",
+  "inner_outer_london"
+)
+
+# dependent variables 
+dependents <- c(
+  #"access_score_15_pt",
+  "access_score_60_pt",
+  #"access_score_15_walk",
+  "access_score_60_walk",
+  "access_score_15_cycle",
+  "access_score_60_cycle"
+)
+
+# fit negative binomial GLM for each dependent 
+fit_nb <- function(dependents, data, independents) {
+  f <- reformulate(independents, response = dependents)
+  glm.nb(f, data = data)
+}
+
+# loop over dependent variables 
+models_nb <- lapply(dependents, fit_nb, data = model_variables, independents = independents)
+names(models_nb) <- dependents
+```
+
+```{r}
+# print summary stats of all models
+for (nm in names(models_nb)) {
+  cat("\n=====================================================\n")
+  cat("MODEL:", nm, "\n")
+  cat("=====================================================\n")
+  print(summary(models_nb[[nm]]))
+}
+```
+
+## 6. Poisson Regression
+
+```{r}
+# independent variables to be the same for every model
+independents <- c(
+  "imd_z * suhii_z",
+  "log_pop_density_z",
+  "age_4_under_z",
+  "age_65_over_z",
+  "ethnic_minority_z",
+  "inner_outer_london"
+)
+
+# dependent variables
+dependents <- c(
+  "access_score_15_pt",
+  #"access_score_60_pt",
+  "access_score_15_walk"
+  #"access_score_60_walk",
+  #"access_score_15_cycle",
+  #"access_score_60_cycle"
+)
+
+# fit poisson GLM for each dependent 
+fit_poisson <- function(dependents, data, independents) {
+  f <- reformulate(independents, response = dependents)
+  glm(f, data = model_variables, family = poisson(link = "log"))
+}
+
+# loop over dependent variables 
+models_poisson <- lapply(dependents, fit_poisson, data = model_variables, independents = independents)
+names(models_poisson) <- dependents
+```
+
+```{r}
+# print summary stats of all models
+for (nm in names(models_poisson)) {
+  cat("\n=====================================================\n")
+  cat("MODEL:", nm, "\n")
+  cat("=====================================================\n")
+  print(summary(models_poisson[[nm]]))
+}
+```
+
+```{r}
+# check Poisson dispersion
+# https://www.rdocumentation.org/packages/insurancerating/versions/0.7.5/topics/check_overdispersion 
+dispersion_results <- lapply(
+  models_poisson,
+  performance::check_overdispersion
+)
+
+dispersion_results
+```
+
+AIC values as below table (bold text refers to lower AIC values. As well as dispersion checked as above, dispersion values close to 1.
+
+| Dependent variable    | AIC - Negative Binomial | AIC - Poisson |
+|-----------------------|-------------------------|---------------|
+| access_score_15_pt    | 13934                   | **13932**     |
+| access_score_60_pt    | **49596**               | 90101         |
+| access_score_15_walk  | 16249                   | **16247**     |
+| access_score_60_walk  | **32617**               | 33312         |
+| access_score_15_cycle | **21932**               | 22076         |
+| access_score_60_cycle | **42929**               | 55092         |
+
+## 7. Residuals with Moran's I
+
+**Build spatial weights with LSOA boundary**
+
+```{r}
+#calculate the centroids of all LSOA in London
+coordsLSOA <- london_lsoa%>%
+  st_centroid()%>%
+  st_geometry()
+
+#plot(coordsLSOA)
+```
+
+```{r}
+# generate spatial weights matrix 
+
+# queen contiguity
+LLSOA_nb <- london_lsoa %>%
+  poly2nb(., queen=T)
+
+# k nearest neighbours
+knn_LSOA <-coordsLSOA %>%
+  knearneigh(., k=4)
+
+LLSOA_knn <- knn_LSOA %>%
+  knn2nb()
+```
+
+```{r, eval=FALSE}
+plot(LLSOA_nb, st_geometry(coordsLSOA), col="red")
+```
+
+```{r, eval=FALSE}
+plot(LLSOA_knn, st_geometry(coordsLSOA), col="blue")
+```
+
+```{r}
+#create a spatial weights matrix object from these weights
+
+# queen contiguity spatial weight matrix
+LLSOA.queens_weight <- LLSOA_nb %>%
+  nb2listw(., style="W")
+
+# k=4 nearest neighbours spatial weight matrix
+LLSOA.knn_4_weight <- LLSOA_knn %>%
+  nb2listw(., style="W")
+```
+
+### 7.1. access_score_15_pt
+
+```{r}
+# name object first
+model_15_pt <- models_poisson$access_score_15_pt
+# VIF
+vif(model_15_pt)
+```
+
+VIF values are all below 5 or 10, no problem with multicolinearity, next look at residuals (auto)correlation (repeat for all)
+
+**Residuals and Map**
+
+```{r}
+# residuals with pearson
+model_15_pt_resids <- residuals(model_15_pt, "pearson")
+
+model_profile <- model_variables %>%
+  mutate(model_15_pt_resids)
+
+#now plot the residuals
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_15_pt_resids")
+```
+
+**Moran's I - Queens Case**
+
+```{r}
+# queens case
+model_15_pt_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_pt_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight)%>%
+  tidy()
+
+model_15_pt_resids_queen
+```
+
+**Moran's I - 4 Nearest Neighbours**
+
+```{r}
+# nearest neighbour
+model_15_pt_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_pt_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight)%>%
+  tidy()
+
+model_15_pt_resids_nearest_neighbour
+```
+
+### 7.2. access_score_60_pt
+
+```{r}
+# name object first
+model_60_pt <- models_nb$access_score_60_pt
+
+# VIF
+vif(model_60_pt)
+```
+
+**Residuals and Map**
+
+```{r}
+# residuals with pearson
+model_60_pt_resids <- residuals(model_60_pt, "pearson")
+
+model_profile <- model_variables %>%
+  mutate(model_60_pt_resids)
+
+#now plot the residuals
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_60_pt_resids")
+```
+
+**Moran's I - Queens Case**
+
+```{r}
+# queens case
+model_60_pt_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_pt_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight)%>%
+  tidy()
+
+model_60_pt_resids_queen
+```
+
+**Moran's I - 4 Nearest Neighbours**
+
+```{r}
+# nearest neighbour
+model_60_pt_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_pt_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight)%>%
+  tidy()
+
+model_60_pt_resids_nearest_neighbour
+```
+
+### 7.3. access_score_15_walk (Poisson)
+
+```{r}
+# name object first
+model_15_walk <- models_poisson$access_score_15_walk
+# VIF
+vif(model_15_walk)
+```
+
+**Residuals and Map**
+
+```{r}
+# residuals with pearson
+model_15_walk_resids <- residuals(model_15_walk, "pearson")
+
+model_profile <- model_variables %>%
+  mutate(model_15_walk_resids)
+
+#now plot the residuals
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_15_walk_resids")
+```
+
+**Moran's I - Queens Case**
+
+```{r}
+# queens case
+model_15_walk_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_walk_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight)%>%
+  tidy()
+
+model_15_walk_resids_queen
+```
+
+**Moran's I - 4 Nearest Neighbours**
+
+```{r}
+# nearest neighbour
+model_15_walk_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_walk_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight)%>%
+  tidy()
+
+model_15_walk_resids_nearest_neighbour
+```
+
+### 7.4. access_score_60_walk
+
+```{r}
+# name object first
+model_60_walk <- models_nb$access_score_60_walk
+# VIF
+vif(model_60_walk)
+```
+
+**Residuals and Map**
+
+```{r}
+# residuals with pearson 
+model_60_walk_resids <- residuals(model_60_walk, "pearson")  
+
+model_profile <- model_variables %>%   
+  mutate(model_60_walk_resids)  
+
+#now plot the residuals 
+#tmap_mode("view") 
+#qtm(model_profile, fill = "model_60_walk_resids")
+```
+
+**Moran's I - Queens Case**
+
+```{r}
+# queens case 
+model_60_walk_resids_queen <- model_profile %>%   
+  st_drop_geometry()%>%   
+  dplyr::select(model_60_walk_resids)%>%   
+  pull()%>%   
+  moran.test(., LLSOA.queens_weight)%>%   
+  tidy()  
+
+model_60_walk_resids_queen
+```
+
+**Moran's I - 4 Nearest Neighbours**
+
+```{r}
+# nearest neighbour 
+model_60_walk_resids_nearest_neighbour <- model_profile %>%   
+  st_drop_geometry()%>%   
+  dplyr::select(model_60_walk_resids)%>%   
+  pull()%>%   
+  moran.test(., LLSOA.knn_4_weight)%>%   
+  tidy()  
+
+model_60_walk_resids_nearest_neighbour
+```
+
+### 7.5. access_score_15_cycle
+
+```{r}
+# name object first
+model_15_cycle <- models_nb$access_score_15_cycle
+# VIF
+vif(model_15_cycle)
+```
+
+**Residuals and Map**
+
+```{r}
+# residuals with pearson  
+model_15_cycle_resids <- residuals(model_15_cycle, "pearson")    
+
+model_profile <- model_variables %>%      
+  mutate(model_15_cycle_resids)    
+
+#now plot the residuals  
+#tmap_mode("view")  
+#qtm(model_profile, fill = "model_15_cycle_resids")
+```
+
+**Moran's I - Queens Case**
+
+```{r}
+# queens case  
+model_15_cycle_resids_queen <- model_profile %>%      
+  st_drop_geometry()%>%      
+  dplyr::select(model_15_cycle_resids)%>%      
+  pull()%>%      
+  moran.test(., LLSOA.queens_weight)%>%      
+  tidy()    
+
+model_15_cycle_resids_queen
+```
+
+**Moran's I - 4 Nearest Neighbours**
+
+```{r}
+# nearest neighbour  
+model_15_cycle_resids_nearest_neighbour <- model_profile %>%      
+  st_drop_geometry()%>%      
+  dplyr::select(model_15_cycle_resids)%>%      
+  pull()%>%      
+  moran.test(., LLSOA.knn_4_weight)%>%      
+  tidy()    
+
+model_15_cycle_resids_nearest_neighbour
+```
+
+### 7.6. access_score_60_cycle
+
+```{r}
+# name object first
+model_60_cycle <- models_nb$access_score_60_cycle
+# VIF
+vif(model_60_cycle)
+```
+
+**Residuals and Map**
+
+```{r}
+# residuals with pearson   
+model_60_cycle_resids <- residuals(model_60_cycle, "pearson")      
+
+model_profile <- model_variables %>%         
+  mutate(model_60_cycle_resids)      
+
+#now plot the residuals   
+#tmap_mode("view")   
+#qtm(model_profile, fill = "model_60_cycle_resids")
+```
+
+**Moran's I - Queens Case**
+
+```{r}
+# queens case   
+model_60_cycle_resids_queen <- model_profile %>%         
+  st_drop_geometry()%>%         
+  dplyr::select(model_60_cycle_resids)%>%         
+  pull()%>%         
+  moran.test(., LLSOA.queens_weight)%>%         
+  tidy()      
+
+model_60_cycle_resids_queen
+```
+
+**Moran's I - 4 Nearest Neighbours**
+
+```{r}
+# nearest neighbour   
+model_60_cycle_resids_nearest_neighbour <- model_profile %>%         
+  st_drop_geometry()%>%         
+  dplyr::select(model_60_cycle_resids)%>%         
+  pull()%>%         
+  moran.test(., LLSOA.knn_4_weight)%>%         
+  tidy()      
+
+model_60_cycle_resids_nearest_neighbour
+```
+
+### 7.7. Summary of Models' residuals
+
+```{r}
+# ============================================================
+# GLM Moran's I summary table
+# ============================================================
+
+# Function to calculate Moran's I and extract Moran's I + p-value
+get_moran <- function(residuals, weights) {
+  
+  test <- spdep::moran.test(residuals, weights)
+  
+  tibble::tibble(
+    moran_i = unname(test$estimate[["Moran I statistic"]]),
+    p_value = test$p.value
+  )
+}
+
+
+# Run Moran's I tests for all six GLM residuals
+glm_morans_table <- dplyr::bind_rows(
+  
+  # 15-minute PT
+  dplyr::bind_cols(
+    tibble::tibble(Model = "15-minute PT"),
+    get_moran(
+      model_15_pt_resids,
+      LLSOA.queens_weight
+    ) %>%
+      dplyr::rename(
+        `Queens Moran's I` = moran_i,
+        `Queens p-value` = p_value
+      ),
+    get_moran(
+      model_15_pt_resids,
+      LLSOA.knn_4_weight
+    ) %>%
+      dplyr::rename(
+        `KNN = 4 Moran's I` = moran_i,
+        `KNN = 4 p-value` = p_value
+      )
+  ),
+  
+  # 60-minute PT
+  dplyr::bind_cols(
+    tibble::tibble(Model = "60-minute PT"),
+    get_moran(
+      model_60_pt_resids,
+      LLSOA.queens_weight
+    ) %>%
+      dplyr::rename(
+        `Queens Moran's I` = moran_i,
+        `Queens p-value` = p_value
+      ),
+    get_moran(
+      model_60_pt_resids,
+      LLSOA.knn_4_weight
+    ) %>%
+      dplyr::rename(
+        `KNN = 4 Moran's I` = moran_i,
+        `KNN = 4 p-value` = p_value
+      )
+  ),
+  
+  # 15-minute Walking
+  dplyr::bind_cols(
+    tibble::tibble(Model = "15-minute Walking"),
+    get_moran(
+      model_15_walk_resids,
+      LLSOA.queens_weight
+    ) %>%
+      dplyr::rename(
+        `Queens Moran's I` = moran_i,
+        `Queens p-value` = p_value
+      ),
+    get_moran(
+      model_15_walk_resids,
+      LLSOA.knn_4_weight
+    ) %>%
+      dplyr::rename(
+        `KNN = 4 Moran's I` = moran_i,
+        `KNN = 4 p-value` = p_value
+      )
+  ),
+  
+  # 60-minute Walking
+  dplyr::bind_cols(
+    tibble::tibble(Model = "60-minute Walking"),
+    get_moran(
+      model_60_walk_resids,
+      LLSOA.queens_weight
+    ) %>%
+      dplyr::rename(
+        `Queens Moran's I` = moran_i,
+        `Queens p-value` = p_value
+      ),
+    get_moran(
+      model_60_walk_resids,
+      LLSOA.knn_4_weight
+    ) %>%
+      dplyr::rename(
+        `KNN = 4 Moran's I` = moran_i,
+        `KNN = 4 p-value` = p_value
+      )
+  ),
+  
+  # 15-minute Cycling
+  dplyr::bind_cols(
+    tibble::tibble(Model = "15-minute Cycling"),
+    get_moran(
+      model_15_cycle_resids,
+      LLSOA.queens_weight
+    ) %>%
+      dplyr::rename(
+        `Queens Moran's I` = moran_i,
+        `Queens p-value` = p_value
+      ),
+    get_moran(
+      model_15_cycle_resids,
+      LLSOA.knn_4_weight
+    ) %>%
+      dplyr::rename(
+        `KNN = 4 Moran's I` = moran_i,
+        `KNN = 4 p-value` = p_value
+      )
+  ),
+  
+  # 60-minute Cycling
+  dplyr::bind_cols(
+    tibble::tibble(Model = "60-minute Cycling"),
+    get_moran(
+      model_60_cycle_resids,
+      LLSOA.queens_weight
+    ) %>%
+      dplyr::rename(
+        `Queens Moran's I` = moran_i,
+        `Queens p-value` = p_value
+      ),
+    get_moran(
+      model_60_cycle_resids,
+      LLSOA.knn_4_weight
+    ) %>%
+      dplyr::rename(
+        `KNN = 4 Moran's I` = moran_i,
+        `KNN = 4 p-value` = p_value
+      )
+  )
+)
+
+
+# Format values for reporting
+glm_morans_table_report <- glm_morans_table %>%
+  dplyr::mutate(
+    `Queens Moran's I` =
+      sprintf("%.3f", `Queens Moran's I`),
+    
+    `Queens p-value` =
+      format.pval(
+        `Queens p-value`,
+        digits = 3,
+        eps = 0.001
+      ),
+    
+    `KNN = 4 Moran's I` =
+      sprintf("%.3f", `KNN = 4 Moran's I`),
+    
+    `KNN = 4 p-value` =
+      format.pval(
+        `KNN = 4 p-value`,
+        digits = 3,
+        eps = 0.001
+      )
+  )
+
+
+# Display final table
+knitr::kable(
+  glm_morans_table_report,
+  align = c("l", "c", "c", "c", "c"),
+  caption = "Moran's I tests of GLM residual spatial autocorrelation"
+)
+```
+
+| Model          | Family            | Moran's I (Queens) | Moran's I (knn) |
+|----------------|-------------------|--------------------|-----------------|
+| model_15_pt    | Poisson           | 0.5119248          | 0.5322355       |
+| model_60_pt    | Negative Binomial | 0.6729391          | 0.6872948       |
+| model_15_walk  | Poisson           | 0.6667913          | 0.6918659       |
+| model_60_walk  | Negative Binomial | 0.9055903          | 0.9090586       |
+| model_15_cycle | Negative Binomial | 0.7601062          | 0.7765267       |
+| model_60_cycle | Negative Binomial | 0.9209963          | 0.9120826       |
+
+Strong positive spatial autocorrelation for queens case and nearest neighbours by Moran's I for all models, so next use spatial models
+
+## 8. Global Spatial Regression model (BYM2)
+
+Given that the data type is **count data**, traditional **spatial error** models **may not be suitable** here ( <https://www.econstor.eu/bitstream/10419/168040/1/89655662X.pdf>).
+
+Bayesian spatial multilevel mixed-effects model incoporating BMY2 with `INLA` package
+
+```{r}
+# INLA package: https://www.r-inla.org/download/index.html
+
+# this works ocassionally:
+#install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
+
+# safer to download package with this:
+install.packages("INLA", repos=c(getOption("repos"), INLA="https://inla.r-inla-download.org/R/testing"), dep=TRUE)
+```
+
+```{r}
+# reload packages (if restarted R)
+library(ggplot2)
+library(tmap)
+library(cowplot)
+library(sf)
+library(spdep)
+library(dplyr)
+library(tidyverse)
+library(broom)
+library(INLA)
+library(INLAtools)
+library(performance)
+```
+
+```{r}
+# check INLA package version
+packageVersion("INLA")
+```
+
+```{r}
+# uncomment and add this if crash:
+# inla.setOption(inla.mode="experimental") 
+
+# check INLA version details
+INLA::inla.version()
+```
+
+```{r}
+# make a spatial model variables object to be clear
+spatial_model_variables <- model_variables %>%
+  dplyr::select(
+    lsoa21cd,
+    # dependent
+    access_score_15_pt,
+    access_score_60_pt,
+    access_score_15_walk,
+    access_score_60_walk,
+    access_score_15_cycle,
+    access_score_60_cycle,
+    # independent
+    imd_z,
+    suhii_z,
+    log_pop_density_z,
+    age_4_under_z,
+    age_65_over_z,
+    ethnic_minority_z,
+    inner_outer_london,
+    geometry
+  ) %>%
+  arrange(lsoa21cd)
+```
+
+```{r}
+# check if it is sf objects
+class(spatial_model_variables)
+```
+
+### 8.1. Spatial Neighbourhood structure
+
+```{r}
+# from here onwards adapted code from: 
+# https://www.r-inla.org/examples/AlvinBong/alvinbong-example.html, a tutorial that uses count-based areal data
+# and also:
+# https://www.sciencedirect.com/science/article/pii/S1353829225001765?via%3Dihub#sec2 --> https://github.com/mbcalles/Area-Level-Deprivation-Traffic-Injury
+
+library(INLA)
+
+# 1. Create a neighborhood list based on polygon contiguity - queens
+nb <- spdep::poly2nb(
+  spatial_model_variables,
+  queen = TRUE
+)
+
+# 2. Convert the neighbor list to INLA adjacency format
+spdep::nb2INLA("data/map.graph", nb)
+
+# 3. Set the location of the adjacency file for INLA
+map.adj <- file.path(getwd(), "data", "map.graph")
+
+# 4. Load adjacency matrix as a graph for INLA spatial models
+g <- inla.read.graph(filename = map.adj)
+```
+
+### 8.2. Inla call/ fit - Generalised Linear Models (Poisson)
+
+```{r}
+# index for spatial effects
+spatial_model_variables$area_id <- 1:nrow(spatial_model_variables)
+```
+
+```{r}
+# specify model formula
+formula_15_pt <- access_score_15_pt ~
+  imd_z * suhii_z +
+  log_pop_density_z +
+  age_4_under_z +
+  age_65_over_z +
+  ethnic_minority_z +
+  factor(inner_outer_london) +
+  f(
+    area_id,
+    model = "bym2",
+    graph = g,
+    constr = TRUE,
+    scale.model = TRUE
+  )
+
+
+formula_60_pt <- access_score_60_pt ~
+  imd_z * suhii_z +
+  log_pop_density_z +
+  age_4_under_z +
+  age_65_over_z +
+  ethnic_minority_z +
+  factor(inner_outer_london) +
+  f(
+    area_id,
+    model = "bym2",
+    graph = g,
+    constr = TRUE,
+    scale.model = TRUE
+  )
+
+
+formula_15_walk <- access_score_15_walk ~
+  imd_z * suhii_z +
+  log_pop_density_z +
+  age_4_under_z +
+  age_65_over_z +
+  ethnic_minority_z +
+  factor(inner_outer_london) +
+  f(
+    area_id,
+    model = "bym2",
+    graph = g,
+    constr = TRUE,
+    scale.model = TRUE
+  )
+
+
+formula_60_walk <- access_score_60_walk ~
+  imd_z * suhii_z +
+  log_pop_density_z +
+  age_4_under_z +
+  age_65_over_z +
+  ethnic_minority_z +
+  factor(inner_outer_london) +
+  f(
+    area_id,
+    model = "bym2",
+    graph = g,
+    constr = TRUE,
+    scale.model = TRUE
+  )
+
+
+formula_15_cycle <- access_score_15_cycle ~
+  imd_z * suhii_z +
+  log_pop_density_z +
+  age_4_under_z +
+  age_65_over_z +
+  ethnic_minority_z +
+  factor(inner_outer_london) +
+  f(
+    area_id,
+    model = "bym2",
+    graph = g,
+    constr = TRUE,
+    scale.model = TRUE
+  )
+
+
+formula_60_cycle <- access_score_60_cycle ~
+  imd_z * suhii_z +
+  log_pop_density_z +
+  age_4_under_z +
+  age_65_over_z +
+  ethnic_minority_z +
+  factor(inner_outer_london) +
+  f(
+    area_id,
+    model = "bym2",
+    graph = g,
+    constr = TRUE,
+    scale.model = TRUE
+  )
+```
+
+**15 pt**
+
+```{r}
+# run model
+model_15_pt_bym2 <- INLA::inla(
+  formula = formula_15_pt,
+  family = "poisson",
+  data = spatial_model_variables,
+  control.predictor = list(compute = TRUE),
+  # control.compute = list(return.marginals.predictor = TRUE), 
+  # https://becarioprecario.bitbucket.io/inla-gitbook/ch-spatial.html#sec:lattice 
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE, 
+                         return.marginals.predictor=TRUE),
+  verbose = FALSE
+)
+
+#summary(model_15_pt_bym2)
+```
+
+**60 pt**
+
+```{r}
+# run model
+model_60_pt_bym2 <- INLA::inla(
+  formula = formula_60_pt,
+  family = "poisson",
+  data = spatial_model_variables,
+  control.predictor = list(compute = TRUE),
+  #control.compute = list(return.marginals.predictor = TRUE), 
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE, 
+                         return.marginals.predictor=TRUE),
+  verbose = FALSE
+)
+
+#summary(model_60_pt_bym2)
+```
+
+**15 walk**
+
+```{r}
+# run model
+model_15_walk_bym2 <- INLA::inla(
+  formula = formula_15_walk,
+  family = "poisson",
+  data = spatial_model_variables,
+  control.predictor = list(compute = TRUE),
+  #control.compute = list(return.marginals.predictor = TRUE), 
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE, 
+                         return.marginals.predictor=TRUE), 
+  verbose = FALSE
+)
+
+#summary(model_15_walk_bym2)
+```
+
+**60 walk**
+
+```{r}
+# run model
+model_60_walk_bym2 <- INLA::inla(
+  formula = formula_60_walk,
+  family = "poisson",
+  data = spatial_model_variables, 
+  control.predictor = list(compute = TRUE),
+  #control.compute = list(return.marginals.predictor = TRUE), 
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE, 
+                         return.marginals.predictor=TRUE),
+  verbose = FALSE
+)
+
+#summary(model_60_walk_bym2)
+```
+
+Save as a RDS object:
+
+```{r}
+saveRDS(model_15_pt_bym2, "data/BYM2/model_15_pt_bym2.rds")
+saveRDS(model_60_pt_bym2, "data/BYM2/model_60_pt_bym2.rds")
+saveRDS(model_15_walk_bym2, "data/BYM2//model_15_walk_bym2.rds")
+saveRDS(model_60_walk_bym2, "data/BYM2/model_60_walk_bym2.rds")
+```
+
+```{r}
+# clear the bym2 memory
+rm(
+  model_15_pt_bym2,
+  model_60_pt_bym2,
+  model_15_walk_bym2,
+  model_60_walk_bym2
+)
+
+gc()
+```
+
+**15 cycle**
+
+```{r}
+# run model
+model_15_cycle_bym2 <- INLA::inla(
+  formula = formula_15_cycle,
+  family = "poisson",
+  data = spatial_model_variables, 
+  control.predictor = list(compute = TRUE),
+  #control.compute = list(return.marginals.predictor = TRUE), 
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE, 
+                         return.marginals.predictor=TRUE),
+  verbose = FALSE
+)
+
+#summary(model_15_cycle_bym2)
+
+# save as RDS
+saveRDS(model_15_cycle_bym2, "data/BYM2/model_15_cycle_bym2.rds")
+```
+
+**60 cycle**
+
+```{r}
+# run model
+model_60_cycle_bym2 <- INLA::inla(
+  formula = formula_60_cycle,
+  family = "poisson",
+  data = spatial_model_variables,
+  control.predictor = list(compute = TRUE),
+  #control.compute = list(return.marginals.predictor = TRUE), 
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE, 
+                         return.marginals.predictor=TRUE), 
+  verbose = FALSE
+)
+
+#summary(model_60_cycle_bym2)
+
+# save as RDS
+saveRDS(model_60_cycle_bym2,"data/BYM2/model_60_cycle_bym2.rds")
+```
+
+```{r}
+# reload
+model_15_pt_bym2    <- readRDS("data/BYM2/model_15_pt_bym2.rds")
+model_60_pt_bym2    <- readRDS("data/BYM2/model_60_pt_bym2.rds")
+model_15_walk_bym2  <- readRDS("data/BYM2/model_15_walk_bym2.rds")
+model_60_walk_bym2  <- readRDS("data/BYM2/model_60_walk_bym2.rds")
+model_15_cycle_bym2 <- readRDS("data/BYM2/model_15_cycle_bym2.rds")
+model_60_cycle_bym2 <- readRDS("data/BYM2/model_60_cycle_bym2.rds")
+```
+
+```{r}
+# name models for clean interpretation
+bym2_models <- list(
+  "Model 1" = model_15_pt_bym2,
+  "Model 2" = model_60_pt_bym2,
+  "Model 3" = model_15_walk_bym2,
+  "Model 4" = model_60_walk_bym2,
+  "Model 5" = model_15_cycle_bym2,
+  "Model 6" = model_60_cycle_bym2
+)
+
+# name variables 
+variable_labels <- c(
+  "(Intercept)" = "Intercept",
+  "imd_z" = "IMD (z)",
+  "suhii_z" = "SUHII (z)",
+  "imd_z:suhii_z" = "IMD × SUHII",
+  "log_pop_density_z" = "Log pop. density (z)",
+  "age_4_under_z" = "Age 4 or under % (z)",                 
+  "age_65_over_z" = "Age 65 or over % (z)",
+  "ethnic_minority_z" = "Ethnic minority % (z)",
+  "factor(inner_outer_london)Inner" = "Inner, Outer London"
+)
+
+# Extract fixed effects, exponentiate to rate ratios, format as one cell
+# just like this: https://www.sciencedirect.com/science/article/pii/S2405673123000144
+fixed_effects_long <- lapply(names(bym2_models), function(model_name) {
+  bym2_models[[model_name]]$summary.fixed %>%
+    as.data.frame() %>%
+    rownames_to_column("term") %>%
+    transmute(
+      model = model_name,
+      variable = variable_labels[term],
+      cell = sprintf(
+        "%.3f (%.3f, %.3f)",
+        # mean IRR and the 95% CI
+        exp(mean), exp(`0.025quant`), exp(`0.975quant`)
+      )
+    )
+}) %>% bind_rows()
+
+# One column per model, one row per variable
+fixed_effects_table <- fixed_effects_long %>%
+  pivot_wider(names_from = model, values_from = cell) %>%
+  arrange(match(variable, variable_labels))
+
+knitr::kable(
+  fixed_effects_table,
+  caption = "BYM2 Fixed Effects Mean Incidence Rate Ratios and 95% Credible Intervals (CI)"
+)
+```
+
+### 8.3. Validation Checks
+
+#### 8.3.1. Diagnostic
+
+<https://becarioprecario.bitbucket.io/inla-gitbook/ch-INLA.html#sec:modelassess>
+
+```{r}
+# List the current six models
+six_models <- list(
+  "15-minute PT"    = model_15_pt_bym2,
+  "60-minute PT"    = model_60_pt_bym2,
+  "15-minute Walking"  = model_15_walk_bym2,
+  "60-minute Walking"  = model_60_walk_bym2,
+  "15-minute Cycling" = model_15_cycle_bym2,
+  "60-minute Cycling" = model_60_cycle_bym2
+)
+```
+
+```{r}
+# Adjusted PIT histograms
+png(
+  filename = "figures/FigC1_Adjusted_PIT_Histograms.png",
+  width = 2400,
+  height = 1600,
+  res = 300
+)
+
+par(mfrow = c(2, 3), mar = c(3, 3, 2, 1))
+
+for (nm in names(six_models)) {
+
+  m <- six_models[[nm]]
+
+  # use valid CPO/PIT observations only
+  valid <- is.finite(m$cpo$pit) &
+           is.finite(m$cpo$cpo) &
+           m$cpo$cpo > 0 &
+           m$cpo$failure == 0
+
+  # adjusted PIT for discrete count data
+  adjusted_pit <- m$cpo$pit[valid] -
+                  0.5 * m$cpo$cpo[valid]
+
+  # histogram information without plotting
+  hist(
+     adjusted_pit,
+     breaks = seq(0, 1, by = 0.05),
+     probability = TRUE,
+     main = nm,
+     xlab = "Adjusted PIT",
+     ylab = "Density",
+     xlim = c(0, 1),
+     # keep y axis consistent for all plots
+     ylim = c(0, 3),
+     yaxt = "n",  
+     col = "steelblue"
+   )
+ 
+ 
+   axis(
+     side = 2,
+     at = seq(0, 3, by = 0.5),
+     labels = sprintf("%.1f", seq(0, 3, by = 0.5))
+   )
+ 
+   # expected density under uniform PIT distribution
+   abline(h = 1, lty = 2)
+}
+
+dev.off()
+
+par(mfrow = c(1, 1))
+```
+
+```{r}
+# Adjusted PIT histograms
+png(
+  filename = "figures/Fig_Adjusted_PIT_Histograms.png",
+  width = 2400,
+  height = 1600,
+  res = 300
+)
+
+par(mfrow = c(2, 3), mar = c(3, 3, 2, 1))
+
+# keep breaks fixed
+pit_breaks <- seq(0, 1, by = 0.05)
+
+# first pass: find a common maximum relative frequency across all plots
+max_rel_freq <- 0
+
+for (nm in names(six_models)) {
+
+  m <- six_models[[nm]]
+
+  valid <- is.finite(m$cpo$pit) &
+           is.finite(m$cpo$cpo) &
+           m$cpo$cpo > 0 &
+           m$cpo$failure == 0
+
+  adjusted_pit <- m$cpo$pit[valid] -
+                  0.5 * m$cpo$cpo[valid]
+
+  h_tmp <- hist(
+    adjusted_pit,
+    breaks = pit_breaks,
+    plot = FALSE
+  )
+
+  rel_freq_tmp <- h_tmp$counts / sum(h_tmp$counts)
+  max_rel_freq <- max(max_rel_freq, rel_freq_tmp)
+}
+
+# round up a bit so all panels share the same y-axis nicely
+y_max <- ceiling(max_rel_freq / 0.01) * 0.01
+
+# second pass: make plots
+for (nm in names(six_models)) {
+
+  m <- six_models[[nm]]
+
+  # use valid CPO/PIT observations only
+  valid <- is.finite(m$cpo$pit) &
+           is.finite(m$cpo$cpo) &
+           m$cpo$cpo > 0 &
+           m$cpo$failure == 0
+
+  # adjusted PIT for discrete count data
+  adjusted_pit <- m$cpo$pit[valid] -
+                  0.5 * m$cpo$cpo[valid]
+
+  # histogram info only
+  h <- hist(
+    adjusted_pit,
+    breaks = pit_breaks,
+    plot = FALSE
+  )
+
+  # convert counts to relative frequencies
+  h$counts <- h$counts / sum(h$counts)
+
+  # plot relative-frequency histogram
+  plot(
+    h,
+    freq = TRUE,
+    main = nm,
+    xlab = "Adjusted PIT",
+    ylab = "Relative frequency",
+    xlim = c(0, 1),
+    ylim = c(0, y_max),
+    yaxt = "n",
+    col = "steelblue"
+  )
+
+  axis(
+    side = 2,
+    at = seq(0, y_max, by = 0.02),
+    labels = sprintf("%.2f", seq(0, y_max, by = 0.02))
+  )
+
+  # expected relative frequency under uniform PIT distribution
+  abline(h = 1 / (length(pit_breaks) - 1), lty = 2)
+}
+
+dev.off()
+
+par(mfrow = c(1, 1))
+```
+
+```{r}
+# summary of DIC, WAIC CPO and MLIK values
+model_summary <- lapply(names(six_models), function(model_name) {
+
+  m <- six_models[[model_name]]
+  valid_cpo <- is.finite(m$cpo$cpo) & m$cpo$cpo > 0
+
+  data.frame(
+    Model = model_name,
+    DIC = m$dic$dic,
+    WAIC = m$waic$waic,
+    Negative_sum_log_CPO = -sum(log(m$cpo$cpo[valid_cpo])),
+    Log_Marginal_Likelihood =
+      m$mlik[1, 1]
+  )
+
+}) %>%
+  dplyr::bind_rows()
+
+model_summary
+```
+
+```{r}
+# check if grraph nodes matches LSOAs
+
+# Number of graph nodes
+cat("Number of graph nodes:", g$n, "\n")
+cat("Number of LSOAs:", nrow(spatial_model_variables), "\n")
+
+cat(
+  "Graph and data sizes match:",
+  g$n == nrow(spatial_model_variables),
+  "\n"
+)
+
+cat(
+  "area_id is correctly ordered:",
+  identical(
+    spatial_model_variables$area_id,
+    seq_len(nrow(spatial_model_variables))
+  ),
+  "\n"
+)
+
+cat(
+  "Number of duplicated LSOA codes:",
+  anyDuplicated(spatial_model_variables$lsoa21cd),
+  "\n"
+)
+```
+
+#### 8.3.2. CPO failures
+
+```{r, eval=FALSE}
+bym2_models <- list(
+  "15-minute Public Transit" = model_15_pt_bym2,
+  "60-minute Public Transit" = model_60_pt_bym2,
+  "15-minute Walking" = model_15_walk_bym2,
+  "60-minute Walking" = model_60_walk_bym2,
+  "15-minute Cycling" = model_15_cycle_bym2,
+  "60-minute Cycling" = model_60_cycle_bym2
+)
+
+cpo_failure_counts <- sapply(
+  bym2_models,
+  function(model) sum(model$cpo$failure > 0, na.rm = TRUE)
+)
+
+cpo_failure_counts
+```
+
+```{r, eval=FALSE}
+# recompute
+model_15_pt_bym2_cpo <- INLA::inla.cpo(
+  model_15_pt_bym2
+)
+
+model_15_walk_bym2_cpo <- INLA::inla.cpo(
+  model_15_walk_bym2
+)
+
+model_15_cycle_bym2_cpo <- INLA::inla.cpo(
+  model_15_cycle_bym2
+)
+
+sum(log(model_15_pt_bym2_cpo$cpo$cpo), na.rm = TRUE)
+sum(log(model_15_walk_bym2_cpo$cpo$cpo), na.rm = TRUE)
+sum(log(model_15_cycle_bym2_cpo$cpo$cpo), na.rm = TRUE)
+```
+
+Barely any changes after recompute, move on...
+
+#### 8.3.3. Residuals
+
+Rebuild the centroids, queens, knn first
+
+```{r}
+# centroids 
+coordsLSOA2 <- spatial_model_variables %>% 
+  st_centroid() %>% 
+  st_geometry()
+
+plot(coordsLSOA2)
+```
+
+map
+
+```{r}
+# queens
+LLSOA_nb2 <- spatial_model_variables %>%
+  poly2nb(., queen = TRUE)
+
+#or nearest neighbours
+knn_LSOA2 <-coordsLSOA2 %>%
+  knearneigh(., k=4)
+
+LLSOA_knn2 <- knn_LSOA2 %>%
+  knn2nb()
+```
+
+```{r, eval=FALSE}
+#plot them
+plot(LLSOA_nb2, st_geometry(coordsLSOA2), col="red")
+```
+
+```{r, eval=FALSE}
+plot(LLSOA_knn, st_geometry(coordsLSOA2), col="blue")
+```
+
+```{r}
+#create a spatial weights matrix object from these weights
+
+LLSOA.queens_weight2 <- LLSOA_nb2 %>%
+  nb2listw(., style="W")
+
+LLSOA.knn_4_weight2 <- LLSOA_knn2 %>%
+  nb2listw(., style="W")
+```
+
+**Pearson Residuals - i = (Y_i − λ̂\_i) / sqrt(λ̂\_i)**
+
+**15 pt**
+
+```{r}
+model_15_pt_bym2_resids <- (
+  # observed minus 
+  spatial_model_variables$access_score_15_pt -
+    # fitted value
+    model_15_pt_bym2$summary.fitted.values$mean
+  # divided by square root of fitted values
+)/sqrt(model_15_pt_bym2$summary.fitted.values$mean)
+
+model_profile <- spatial_model_variables %>%
+  mutate(model_15_pt_bym2_resids)
+
+#now plot the residuals
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_15_pt_bym2_resids")
+```
+
+```{r}
+# queens case
+model_15_pt_bym2_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_pt_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight2)%>%
+  tidy()
+
+model_15_pt_bym2_resids_queen
+```
+
+```{r}
+# nearest neighbour
+model_15_pt_bym2_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_pt_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight2)%>%
+  tidy()
+
+model_15_pt_bym2_resids_nearest_neighbour
+```
+
+**60 pt**
+
+```{r}
+model_60_pt_bym2_resids <- (
+  spatial_model_variables$access_score_60_pt -
+    model_60_pt_bym2$summary.fitted.values$mean
+)/sqrt(model_60_pt_bym2$summary.fitted.values$mean)
+
+model_profile <- spatial_model_variables %>%
+  mutate(model_60_pt_bym2_resids)
+
+#now plot the residuals
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_60_pt_bym2_resids")
+```
+
+```{r}
+# queens case
+model_60_pt_bym2_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_pt_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight2)%>%
+  tidy()
+
+model_60_pt_bym2_resids_queen
+```
+
+```{r}
+# nearest neighbour
+model_60_pt_bym2_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_pt_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight2)%>%
+  tidy()
+
+model_60_pt_bym2_resids_nearest_neighbour
+```
+
+**15 walk**
+
+```{r}
+model_15_walk_bym2_resids <- (
+  spatial_model_variables$access_score_15_walk -
+    model_15_walk_bym2$summary.fitted.values$mean
+)/sqrt(model_15_walk_bym2$summary.fitted.values$mean)
+
+model_profile <- spatial_model_variables %>%
+  mutate(model_15_walk_bym2_resids)
+
+#now plot the residuals
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_15_walk_bym2_resids")
+```
+
+```{r}
+# queens case
+model_15_walk_bym2_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_walk_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight2)%>%
+  tidy()
+
+model_15_walk_bym2_resids_queen
+```
+
+```{r}
+# nearest neighbour
+model_15_walk_bym2_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_walk_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight2)%>%
+  tidy()
+
+model_15_walk_bym2_resids_nearest_neighbour
+```
+
+**60 walk**
+
+```{r}
+model_60_walk_bym2_resids <- (
+  spatial_model_variables$access_score_60_walk -
+    model_60_walk_bym2$summary.fitted.values$mean
+)/sqrt(model_60_walk_bym2$summary.fitted.values$mean)
+
+model_profile <- spatial_model_variables %>%
+  mutate(model_60_walk_bym2_resids)
+
+#now plot the residuals
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_60_walk_bym2_resids")
+```
+
+```{r}
+# queens case
+model_60_walk_bym2_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_walk_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight2)%>%
+  tidy()
+
+model_60_walk_bym2_resids_queen
+```
+
+```{r}
+# nearest neighbour
+model_60_walk_bym2_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_walk_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight2)%>%
+  tidy()
+
+model_60_walk_bym2_resids_nearest_neighbour
+```
+
+**15 cycle**
+
+```{r}
+model_15_cycle_bym2_resids <- (
+  spatial_model_variables$access_score_15_cycle -
+    model_15_cycle_bym2$summary.fitted.values$mean
+)/sqrt(model_15_cycle_bym2$summary.fitted.values$mean)
+
+model_profile <- spatial_model_variables %>%
+  mutate(model_15_cycle_bym2_resids)
+
+#now plot the residuals
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_15_cycle_bym2_resids")
+```
+
+```{r}
+# queens case
+model_15_cycle_bym2_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_cycle_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight2)%>%
+  tidy()
+
+model_15_cycle_bym2_resids_queen
+```
+
+```{r}
+# nearest neighbour
+model_15_cycle_bym2_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_15_cycle_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight2)%>%
+  tidy()
+
+model_15_cycle_bym2_resids_nearest_neighbour
+```
+
+**60 cycle**
+
+```{r}
+model_60_cycle_bym2_resids <- (
+  spatial_model_variables$access_score_60_cycle -
+    model_60_cycle_bym2$summary.fitted.values$mean
+)/sqrt(model_60_cycle_bym2$summary.fitted.values$mean)
+
+model_profile <- spatial_model_variables %>%
+  mutate(model_60_cycle_bym2_resids)
+
+#now plot the residuals
+#tmap_mode("view")
+#qtm(model_profile, fill = "model_60_cycle_bym2_resids")
+```
+
+```{r}
+# queens case
+model_60_cycle_bym2_resids_queen <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_cycle_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.queens_weight2)%>%
+  tidy()
+
+model_60_cycle_bym2_resids_queen
+```
+
+```{r}
+# nearest neighbour
+model_60_cycle_bym2_resids_nearest_neighbour <- model_profile %>%
+  st_drop_geometry()%>%
+  dplyr::select(model_60_cycle_bym2_resids)%>%
+  pull()%>%
+  moran.test(., LLSOA.knn_4_weight2)%>%
+  tidy()
+
+model_60_cycle_bym2_resids_nearest_neighbour
+```
+
+significantly reduced compared to the GLM models, but still some spatial autocorrelation remains –\> write in discussion
+
+```{r}
+# ============================================================
+# BYM2 Moran's I summary table
+# ============================================================
+
+# Function to calculate Moran's I and extract Moran's I + p-value
+get_moran <- function(residuals, weights) {
+  
+  test <- spdep::moran.test(residuals, weights)
+  
+  tibble::tibble(
+    moran_i = unname(test$estimate[["Moran I statistic"]]),
+    p_value = test$p.value
+  )
+}
+
+
+# Run Moran's I tests for all six BYM2 residuals
+bym2_morans_table <- dplyr::bind_rows(
+  
+  # 15-minute PT
+  dplyr::bind_cols(
+    tibble::tibble(Model = "15-minute PT"),
+    get_moran(
+      model_15_pt_bym2_resids,
+      LLSOA.queens_weight2
+    ) %>%
+      dplyr::rename(
+        `Queens Moran's I` = moran_i,
+        `Queens p-value` = p_value
+      ),
+    get_moran(
+      model_15_pt_bym2_resids,
+      LLSOA.knn_4_weight2
+    ) %>%
+      dplyr::rename(
+        `KNN = 4 Moran's I` = moran_i,
+        `KNN = 4 p-value` = p_value
+      )
+  ),
+  
+  # 60-minute PT
+  dplyr::bind_cols(
+    tibble::tibble(Model = "60-minute PT"),
+    get_moran(
+      model_60_pt_bym2_resids,
+      LLSOA.queens_weight2
+    ) %>%
+      dplyr::rename(
+        `Queens Moran's I` = moran_i,
+        `Queens p-value` = p_value
+      ),
+    get_moran(
+      model_60_pt_bym2_resids,
+      LLSOA.knn_4_weight2
+    ) %>%
+      dplyr::rename(
+        `KNN = 4 Moran's I` = moran_i,
+        `KNN = 4 p-value` = p_value
+      )
+  ),
+  
+  # 15-minute Walking
+  dplyr::bind_cols(
+    tibble::tibble(Model = "15-minute Walking"),
+    get_moran(
+      model_15_walk_bym2_resids,
+      LLSOA.queens_weight2
+    ) %>%
+      dplyr::rename(
+        `Queens Moran's I` = moran_i,
+        `Queens p-value` = p_value
+      ),
+    get_moran(
+      model_15_walk_bym2_resids,
+      LLSOA.knn_4_weight2
+    ) %>%
+      dplyr::rename(
+        `KNN = 4 Moran's I` = moran_i,
+        `KNN = 4 p-value` = p_value
+      )
+  ),
+  
+  # 60-minute Walking
+  dplyr::bind_cols(
+    tibble::tibble(Model = "60-minute Walking"),
+    get_moran(
+      model_60_walk_bym2_resids,
+      LLSOA.queens_weight2
+    ) %>%
+      dplyr::rename(
+        `Queens Moran's I` = moran_i,
+        `Queens p-value` = p_value
+      ),
+    get_moran(
+      model_60_walk_bym2_resids,
+      LLSOA.knn_4_weight2
+    ) %>%
+      dplyr::rename(
+        `KNN = 4 Moran's I` = moran_i,
+        `KNN = 4 p-value` = p_value
+      )
+  ),
+  
+  # 15-minute Cycling
+  dplyr::bind_cols(
+    tibble::tibble(Model = "15-minute Cycling"),
+    get_moran(
+      model_15_cycle_bym2_resids,
+      LLSOA.queens_weight2
+    ) %>%
+      dplyr::rename(
+        `Queens Moran's I` = moran_i,
+        `Queens p-value` = p_value
+      ),
+    get_moran(
+      model_15_cycle_bym2_resids,
+      LLSOA.knn_4_weight2
+    ) %>%
+      dplyr::rename(
+        `KNN = 4 Moran's I` = moran_i,
+        `KNN = 4 p-value` = p_value
+      )
+  ),
+  
+  # 60-minute Cycling
+  dplyr::bind_cols(
+    tibble::tibble(Model = "60-minute Cycling"),
+    get_moran(
+      model_60_cycle_bym2_resids,
+      LLSOA.queens_weight2
+    ) %>%
+      dplyr::rename(
+        `Queens Moran's I` = moran_i,
+        `Queens p-value` = p_value
+      ),
+    get_moran(
+      model_60_cycle_bym2_resids,
+      LLSOA.knn_4_weight2
+    ) %>%
+      dplyr::rename(
+        `KNN = 4 Moran's I` = moran_i,
+        `KNN = 4 p-value` = p_value
+      )
+  )
+)
+
+
+# Format values for reporting
+bym2_morans_table_report <- bym2_morans_table %>%
+  dplyr::mutate(
+    `Queens Moran's I` =
+      sprintf("%.3f", `Queens Moran's I`),
+    
+    `Queens p-value` =
+      format.pval(
+        `Queens p-value`,
+        digits = 3,
+        eps = 0.001
+      ),
+    
+    `KNN = 4 Moran's I` =
+      sprintf("%.3f", `KNN = 4 Moran's I`),
+    
+    `KNN = 4 p-value` =
+      format.pval(
+        `KNN = 4 p-value`,
+        digits = 3,
+        eps = 0.001
+      )
+  )
+
+
+# Display final table
+knitr::kable(
+  bym2_morans_table_report,
+  align = c("l", "c", "c", "c", "c"),
+  caption = "Moran's I tests of BYM2 residual spatial autocorrelation"
+)
+```
+
+## 9. BiLISA - Bivariate LISA mapping
+
+Well known method to address issues of spatial nonstationarity, allowing geographic variations in the relationships between dependent and explanatory variables –\> use `spdep` package
+
+Each of the six dependent variables will be mapped with IMD and SUHII respectively:
+
+```{r}
+bilisa_variables <- spatial_model_variables %>%
+  arrange(lsoa21cd)
+
+# Create Queen-contiguity neighbours
+bilisa_nb <- bilisa_variables %>%
+  poly2nb(.,queen = T)
+
+bilisa_weights <-  bilisa_nb %>%
+  nb2listw(.,style = "W",)
+```
+
+### 9.1. Map SUHII
+
+```{r}
+# code adpated from: 
+# https://r-spatial.github.io/spdep/reference/localmoran_bv.html
+
+bilisa_15_pt_suhii <- localmoran_bv(
+  x = bilisa_variables$access_score_15_pt,
+  y = bilisa_variables$suhii_z,
+  listw = bilisa_weights,
+  nsim = 199,
+  scale = TRUE,
+  alternative = "two.sided",
+  iseed = 42,
+  zero.policy = TRUE
+)
+
+head(bilisa_15_pt_suhii)
+```
+
+```{r}
+# to identify significant cluster only (keep p<0.05 only) 
+bilisa_cluster <- spdep::hotspot(
+  bilisa_15_pt_suhii,
+  Prname = "Pr(folded) Sim",
+  cutoff = 0.05,
+  quadrant.type = "pysal",
+  p.adjust = "none"
+)
+```
+
+```{r}
+bilisa_variables$bilisa_cluster <- as.character(
+  bilisa_cluster
+)
+
+bilisa_variables$bilisa_cluster[
+  is.na(bilisa_variables$bilisa_cluster)
+] <- "Not significant"
+```
+
+```{r}
+table(bilisa_variables$bilisa_cluster)
+```
+
+```{r}
+tmap_mode("plot")
+
+tm_shape(bilisa_variables) +
+  tm_polygons(
+    fill = "bilisa_cluster",
+    fill.scale = tm_scale_categorical(),
+    fill.legend = tm_legend(
+      title = "BiLISA Cluster"
+    ),
+    col = NA
+  ) +
+  tm_title(
+    "15-minute Public Transit Accessibility and SUHII"
+  )
+```
+
+```{r}
+# reorder clusters and make better labels
+bilisa_variables <- bilisa_variables %>%
+  mutate(
+    bilisa_cluster_plot = case_when(
+      bilisa_cluster == "Low-High" ~ "Low access–High SUHII",
+      bilisa_cluster == "High-High" ~ "High access–High SUHII",
+      bilisa_cluster == "Low-Low" ~ "Low access–Low SUHII",
+      bilisa_cluster == "High-Low" ~ "High access–Low SUHII",
+      TRUE ~ NA_character_
+    )
+  )
+
+# set legend order
+bilisa_variables$bilisa_cluster_plot <- factor(
+  bilisa_variables$bilisa_cluster_plot,
+  levels = c(
+    "Low access–High SUHII",
+    "High access–High SUHII",
+    "Low access–Low SUHII",
+    "High access–Low SUHII"
+  )
+)
+
+
+cluster_cols <- c(
+  "Low access–High SUHII"  = "#D73027",  # red
+  "High access–High SUHII" = "#F4A582",  # light red / salmon
+  "Low access–Low SUHII"   = "#91BFDB",  # light blue
+  "High access–Low SUHII"  = "#4575B4"   # blue
+)
+```
+
+```{r}
+tmap_mode("plot")
+
+bilisa_15_pt_suhii_suhii_map <-
+  # Base: all LSOAs white
+  tm_shape(bilisa_variables) +
+  tm_fill(
+    fill = "white"
+  ) +
+
+  # Significant clusters
+  tm_shape(
+    dplyr::filter(
+      bilisa_variables,
+      !is.na(bilisa_cluster_plot)
+    )
+  ) +
+  tm_fill(
+    fill = "bilisa_cluster_plot",
+    fill.scale = tm_scale_categorical(
+      values = cluster_cols
+    ),
+    fill.legend = tm_legend(
+      title = "BiLISA cluster",
+      position = tm_pos_out("right", "center"),
+      frame = FALSE
+    )
+  ) +
+
+  # London boundary must come last
+  tm_shape(london_boundary) +
+  tm_borders(
+    col = "grey30",
+    lwd = 1
+  ) +
+
+  tm_title(
+    "15-minute PT accessibility\nand SUHII"
+  ) +
+
+  tm_layout(
+    frame = FALSE,
+    bg.color = "white",
+    outer.margins = 0.02
+  )
+
+bilisa_15_pt_suhii_suhii_map 
+```
+
+**Loop over maps:**
+
+```{r}
+run_bilisa_map <- function(
+    data,
+    access_var,
+    context_var,
+    context_label,
+    map_title,
+    listw = bilisa_weights,
+    boundary = london_boundary,
+    nsim = 199,
+    seed = 42,
+    show_legend = TRUE
+) {
+
+  # Standardise only the accessibility variable
+  access_z <- as.numeric(
+    scale(data[[access_var]])
+  )
+
+  # SUHII or IMD is already a z-score
+  context_z <- data[[context_var]]
+
+  # Check that both variables and weights have matching lengths
+  stopifnot(
+    length(access_z) == length(context_z),
+    length(access_z) == length(listw$neighbours)
+  )
+
+  # Bivariate Local Moran's I
+  lisa_result <- spdep::localmoran_bv(
+    x = access_z,
+    y = context_z,
+    listw = listw,
+    nsim = nsim,
+    scale = FALSE,
+    alternative = "two.sided",
+    iseed = seed,
+    zero.policy = TRUE
+  )
+
+  # to identify significant cluster only (keep p<0.05 only) 
+  lisa_cluster <- spdep::hotspot(
+    lisa_result,
+    Prname = "Pr(folded) Sim",
+    cutoff = 0.05,
+    quadrant.type = "pysal",
+    p.adjust = "none"
+  )
+
+  # Full, readable cluster labels
+  cluster_labels <- c(
+    "Low-High" =
+      paste0("Low access–High ", context_label),
+
+    "High-High" =
+      paste0("High access–High ", context_label),
+
+    "Low-Low" =
+      paste0("Low access–Low ", context_label),
+
+    "High-Low" =
+      paste0("High access–Low ", context_label)
+  )
+
+  cluster_levels <- unname(
+    cluster_labels[
+      c(
+        "Low-High",
+        "High-High",
+        "Low-Low",
+        "High-Low"
+      )
+    ]
+  )
+
+  cluster_colours <- stats::setNames(
+    c(
+      "#D73027",  # Low-High
+      "#F4A582",  # High-High
+      "#91BFDB",  # Low-Low
+      "#4575B4"   # High-Low
+    ),
+    cluster_levels
+  )
+
+  # Create a separate result dataset
+  result_data <- data %>%
+    dplyr::mutate(
+      bilisa_i = as.numeric(lisa_result[, 1]),
+
+      bilisa_p = as.numeric(
+        lisa_result[, "Pr(folded) Sim"]
+      ),
+
+      bilisa_cluster = as.character(
+        lisa_cluster
+      ),
+
+      bilisa_cluster_plot = unname(
+        cluster_labels[bilisa_cluster]
+      ),
+
+      bilisa_cluster_plot = factor(
+        bilisa_cluster_plot,
+        levels = cluster_levels
+      )
+    )
+
+  # Significant areas only
+  significant_data <- result_data %>%
+    dplyr::filter(
+      !is.na(bilisa_cluster_plot)
+    )
+
+  # Show or hide the legend
+  legend_setting <- if (show_legend) {
+    tm_legend(
+      title = "BiLISA cluster",
+      position = tm_pos_out("right", "center"),
+      frame = FALSE
+    )
+  } else {
+    tm_legend_hide()
+  }
+
+  # Create the map
+  map_object <-
+    tm_shape(result_data) +
+    tm_fill(
+      fill = "white"
+    ) +
+
+    tm_shape(significant_data) +
+    tm_fill(
+      fill = "bilisa_cluster_plot",
+
+      fill.scale = tm_scale_categorical(
+        values = cluster_colours
+      ),
+
+      fill.legend = legend_setting
+    ) +
+
+    # London boundary last
+    tm_shape(boundary) +
+    tm_borders(
+      col = "grey30",
+      lwd = 1
+    ) +
+
+    tm_title(
+      map_title
+    ) +
+
+    tm_layout(
+      frame = FALSE,
+      bg.color = "white",
+      outer.margins = 0.02
+    )
+
+  # Return everything
+  list(
+    result = lisa_result,
+    clusters = lisa_cluster,
+    data = result_data,
+    map = map_object
+  )
+}
+```
+
+```{r}
+bilisa_15_pt_suhii <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_15_pt",
+  context_var = "suhii_z",
+  context_label = "SUHII",
+  map_title = NULL,
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_15_pt_suhii_map <- bilisa_15_pt_suhii$map
+
+# plot
+#bilisa_15_pt_suhii_map
+```
+
+```{r}
+bilisa_60_pt_suhii <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_60_pt",
+  context_var = "suhii_z",
+  context_label = "SUHII",
+  map_title = NULL,
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_60_pt_suhii_map <- bilisa_60_pt_suhii$map
+
+# plot
+#bilisa_60_pt_suhii_map
+```
+
+```{r}
+bilisa_15_walk_suhii <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_15_walk",
+  context_var = "suhii_z",
+  context_label = "SUHII",
+  map_title = NULL,
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_15_walk_suhii_map <- bilisa_15_walk_suhii$map
+
+# plot
+#bilisa_15_walk_suhii_map
+```
+
+```{r}
+bilisa_60_walk_suhii <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_60_walk",
+  context_var = "suhii_z",
+  context_label = "SUHII",
+  map_title = NULL,
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_60_walk_suhii_map <- bilisa_60_walk_suhii$map
+
+# plot
+#bilisa_60_walk_suhii_map
+```
+
+```{r}
+bilisa_15_cycle_suhii <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_15_cycle",
+  context_var = "suhii_z",
+  context_label = "SUHII",
+  map_title = NULL,
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_15_cycle_suhii_map <- bilisa_15_cycle_suhii$map
+
+# plot
+#bilisa_15_cycle_suhii_map
+```
+
+```{r}
+bilisa_60_cycle_suhii <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_60_cycle",
+  context_var = "suhii_z",
+  context_label = "SUHII",
+  map_title = NULL,
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_60_cycle_suhii_map <- bilisa_60_cycle_suhii$map
+
+# plot
+#bilisa_60_cycle_suhii_map
+```
+
+```{r}
+bilisa_15_pt_imd <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_15_pt",
+  context_var = "imd_z",
+  context_label = "IMD",
+  map_title = NULL,
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_15_pt_imd_map <- bilisa_15_pt_imd$map
+
+# plot
+#bilisa_15_pt_imd_map
+```
+
+```{r}
+bilisa_60_pt_imd <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_60_pt",
+  context_var = "imd_z",
+  context_label = "IMD",
+  map_title = NULL,
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_60_pt_imd_map <- bilisa_60_pt_imd$map
+
+# plot
+#bilisa_60_pt_imd_map
+```
+
+```{r}
+bilisa_15_walk_imd <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_15_walk",
+  context_var = "imd_z",
+  context_label = "IMD",
+  map_title = NULL,
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_15_walk_imd_map <- bilisa_15_walk_imd$map
+
+# plot
+#bilisa_15_walk_imd_map
+```
+
+```{r}
+bilisa_60_walk_imd <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_60_walk",
+  context_var = "imd_z",
+  context_label = "IMD",
+  map_title = NULL,
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_60_walk_imd_map <- bilisa_60_walk_imd$map
+
+# plot
+#bilisa_60_walk_imd_map
+```
+
+```{r}
+bilisa_15_cycle_imd <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_15_cycle",
+  context_var = "imd_z",
+  context_label = "IMD",
+  map_title = NULL,
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_15_cycle_imd_map <- bilisa_15_cycle_imd$map
+
+# plot
+#bilisa_15_cycle_imd_map
+```
+
+```{r}
+bilisa_60_cycle_imd <- run_bilisa_map(
+  data = bilisa_variables,
+  access_var = "access_score_60_cycle",
+  context_var = "imd_z",
+  context_label = "IMD",
+  map_title = NULL,
+  show_legend = FALSE
+)
+
+# assign as object
+bilisa_60_cycle_imd_map <- bilisa_60_cycle_imd$map
+
+# plot
+#bilisa_60_cycle_imd_map
+```
+
+**Cowplot Combine Maps**
+
+```{r}
+bilisa_grobs <- list(
+  tmap::tmap_grob(bilisa_15_pt_suhii_map),
+  tmap::tmap_grob(bilisa_15_pt_imd_map),
+
+  tmap::tmap_grob(bilisa_15_walk_suhii_map),
+  tmap::tmap_grob(bilisa_15_walk_imd_map),
+
+  tmap::tmap_grob(bilisa_15_cycle_suhii_map),
+  tmap::tmap_grob(bilisa_15_cycle_imd_map)
+)
+
+bilisa_15_maps_combined <- cowplot::plot_grid(
+  plotlist = bilisa_grobs,
+  ncol = 2,
+  labels = c("a", "b", "c", "d", "e", "f"),
+  label_size = 12,
+  align = "hv"
+)
+
+#bilisa_15_maps_combined
+```
+
+```{r}
+# set up a shared legend for plotting purposes
+
+legend_labels <- c(
+  "Low access–High SUHII/IMD",
+  "High access–High SUHII/IMD",
+  "Low access–Low SUHII/IMD",
+  "High access–Low SUHII/IMD"
+)
+
+legend_colours <- c(
+  "Low access–High SUHII/IMD"  = "#D73027",
+  "High access–High SUHII/IMD" = "#F4A582",
+  "Low access–Low SUHII/IMD"   = "#91BFDB",
+  "High access–Low SUHII/IMD"  = "#4575B4"
+)
+
+legend_data <- data.frame(
+  cluster = factor(
+    legend_labels,
+    levels = legend_labels
+  ),
+  x = 1,
+  y = 1:4
+)
+
+legend_plot <- ggplot(
+  legend_data,
+  aes(x = x, y = y, fill = cluster)
+) +
+  geom_point(
+    shape = 22,
+    size = 8,
+    colour = NA
+  ) +
+  scale_fill_manual(
+    values = legend_colours,
+    breaks = legend_labels,
+    drop = FALSE,
+    name = "BiLISA clusters"
+  ) +
+  guides(
+    fill = guide_legend(
+      override.aes = list(
+        shape = 22,
+        size = 8,
+        colour = NA
+      )
+    )
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.key.height = grid::unit(0.65, "cm"),
+    legend.key.width = grid::unit(0.65, "cm"),
+    legend.background = element_blank()
+  )
+
+shared_legend <- cowplot::get_legend(
+  legend_plot,
+  legend = "right"
+)
+```
+
+```{r}
+# 15 min BiLISA maps
+#bilisa_15_final <- cowplot::plot_grid(
+#  bilisa_15_maps_combined,
+#  shared_legend,
+#  ncol = 2,
+#  rel_widths = c(0.78, 0.22)
+#)
+
+#bilisa_15_final
+
+# Combine the six maps with the shared legend
+bilisa_15_body <- cowplot::plot_grid(
+  bilisa_15_maps_combined,
+  shared_legend,
+  ncol = 2,
+  rel_widths = c(0.82, 0.18)
+)
+
+# Create centred overall title
+bilisa_15_title <- cowplot::ggdraw() +
+  cowplot::draw_label(
+    "15-minute Accessibility with SUHII and IMD",
+    fontface = "bold",
+    size = 14,
+    hjust = 0.5,
+    x = 0.5
+  )
+
+# Place the title above the maps
+bilisa_15_final <- cowplot::plot_grid(
+  bilisa_15_title,
+  bilisa_15_body,
+  ncol = 1,
+  rel_heights = c(0.06, 0.94)
+)
+
+bilisa_15_final
+```
+
+```{r, eval= FALSE}
+# save as png
+ggsave(
+  filename = "figures/FigD1_BiLISA_15_min_LH.png",
+  plot = bilisa_15_final,
+  width = 12.2,
+  height = 9.5,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
+```
+
+```{r}
+# 60 min BiLISA maps
+bilisa_grobs2 <- list(
+  tmap::tmap_grob(bilisa_60_pt_suhii_map),
+  tmap::tmap_grob(bilisa_60_pt_imd_map),
+
+  tmap::tmap_grob(bilisa_60_walk_suhii_map),
+  tmap::tmap_grob(bilisa_60_walk_imd_map),
+
+  tmap::tmap_grob(bilisa_60_cycle_suhii_map),
+  tmap::tmap_grob(bilisa_60_cycle_imd_map)
+)
+
+bilisa_60_maps_combined <- cowplot::plot_grid(
+  plotlist = bilisa_grobs2,
+  ncol = 2,
+  labels = c("a", "b", "c", "d", "e", "f"),
+  label_size = 12,
+  align = "hv"
+)
+
+#bilisa_60_maps_combined
+```
+
+```{r}
+#bilisa_60_final <- cowplot::plot_grid(
+#  bilisa_60_maps_combined,
+#  shared_legend,
+#  ncol = 2,
+#  rel_widths = c(0.78, 0.22)
+#)
+
+#bilisa_60_final
+
+
+# Combine the six maps with the shared legend
+bilisa_60_body <- cowplot::plot_grid(
+  bilisa_60_maps_combined,
+  shared_legend,
+  ncol = 2,
+  rel_widths = c(0.82, 0.18)
+)
+
+# Create centred overall title
+bilisa_60_title <- cowplot::ggdraw() +
+  cowplot::draw_label(
+    "60-minute Accessibility with SUHII and IMD",
+    fontface = "bold",
+    size = 14,
+    hjust = 0.5,
+    x = 0.5
+  )
+
+# Place the title above the maps
+bilisa_60_final <- cowplot::plot_grid(
+  bilisa_60_title,
+  bilisa_60_body,
+  ncol = 1,
+  rel_heights = c(0.06, 0.94)
+)
+
+bilisa_60_final
+```
+
+```{r, eval=FALSE}
+ggsave(
+  filename = "figures/FigD2_BiLISA_60_min_LH.png",
+  plot = bilisa_60_final,
+  width = 12.2,
+  height = 9.5,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
+```
+
+### 9.2. Distribution of BiLISA Cluster
+
+```{r}
+# Put the 12 existing BiLISA objects into a named list
+bilisa_results <- list(
+  "15-minute Public Transit and SUHII" = bilisa_15_pt_suhii,
+  "15-minute Public Transit and IMD"   = bilisa_15_pt_imd,
+
+  "15-minute Walking and SUHII" = bilisa_15_walk_suhii,
+  "15-minute Walking and IMD"   = bilisa_15_walk_imd,
+
+  "15-minute Cycling and SUHII" = bilisa_15_cycle_suhii,
+  "15-minute Cycling and IMD"   = bilisa_15_cycle_imd,
+
+  "60-minute Public Transit and SUHII" = bilisa_60_pt_suhii,
+  "60-minute Public Transit and IMD"   = bilisa_60_pt_imd,
+
+  "60-minute Walking and SUHII" = bilisa_60_walk_suhii,
+  "60-minute Walking and IMD"   = bilisa_60_walk_imd,
+
+  "60-minute Cycling and SUHII" = bilisa_60_cycle_suhii,
+  "60-minute Cycling and IMD"   = bilisa_60_cycle_imd
+)
+
+
+# Extract cluster classifications from each result
+bilisa_long <- bind_rows(
+  lapply(
+    names(bilisa_results),
+    function(analysis_name) {
+
+      cluster_values <- as.character(
+        bilisa_results[[analysis_name]]$clusters
+      )
+
+      # hotspot() stores non-significant LSOAs as NA
+      cluster_values[is.na(cluster_values)] <- "Not significant"
+
+      tibble(
+        Analysis = analysis_name,
+        Cluster = cluster_values
+      )
+    }
+  )
+)
+```
+
+```{r}
+analysis_order <- names(bilisa_results)
+
+cluster_order <- c(
+  "High-High",
+  "High-Low",
+  "Low-High",
+  "Low-Low",
+  "Not significant"
+)
+
+# Count LSOAs in each classification
+bilisa_counts <- bilisa_long %>%
+  dplyr::count(
+    Analysis,
+    Cluster,
+    name = "n"
+  ) %>%
+  tidyr::complete(
+    Analysis = analysis_order,
+    Cluster = cluster_order,
+    fill = list(n = 0)
+  ) %>%
+  dplyr::group_by(Analysis) %>%
+  dplyr::mutate(
+    total_lsoas = sum(n),
+    percentage = (n / total_lsoas) * 100,
+
+    table_value = sprintf(
+      "%s (%.1f%%)",
+      scales::comma(n),
+      percentage
+    )
+  ) %>%
+  dplyr::ungroup()
+
+# Convert into the final 12-row table
+bilisa_table <- bilisa_counts %>%
+  dplyr::mutate(
+    Analysis = factor(
+      Analysis,
+      levels = analysis_order
+    ),
+
+    Cluster = factor(
+      Cluster,
+      levels = cluster_order
+    )
+  ) %>%
+  dplyr::arrange(
+    Analysis,
+    Cluster
+  ) %>%
+  dplyr::select(
+    Analysis,
+    Cluster,
+    table_value
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = Cluster,
+    values_from = table_value
+  ) %>%
+  dplyr::select(
+    Analysis,
+    `High-High`,
+    `High-Low`,
+    `Low-High`,
+    `Low-Low`,
+    `Not significant`
+  ) %>%
+  dplyr::mutate(
+    Analysis = as.character(Analysis)
+  )
+
+bilisa_table
+```
+
+### 9.3. Low High BiLISA
+
+```{r}
+# Function to compare the Low access–High SUHII and
+# Low access–High IMD clusters for the same transport mode
+create_priority_two_combined <- function(suhii_object, imd_object) {
+
+  suhii_object$data %>%
+    dplyr::select(
+      lsoa21cd,
+      suhii_cluster = bilisa_cluster
+    ) %>%
+
+    # Join the matching IMD BiLISA classification by LSOA code
+    dplyr::left_join(
+      imd_object$data %>%
+        sf::st_drop_geometry() %>%
+        dplyr::select(
+          lsoa21cd,
+          imd_cluster = bilisa_cluster
+        ),
+      by = "lsoa21cd"
+    ) %>%
+
+    # Identify whether each LSOA belongs to either or both
+    # Low access–High contextual-variable clusters
+    dplyr::mutate(
+      two_combined_class = dplyr::case_when(
+
+        suhii_cluster == "Low-High" &
+          imd_cluster == "Low-High" ~
+          "High SUHII and IMD",
+
+        suhii_cluster == "Low-High" ~
+          "High SUHII",
+
+        imd_cluster == "Low-High" ~
+          "High IMD",
+
+        TRUE ~ "Not Significant"
+      ),
+
+      # Set the legend order
+      two_combined_class = factor(
+        two_combined_class,
+        levels = c(
+          "High SUHII and IMD",
+          "High SUHII",
+          "High IMD",
+          "Not Significant"
+        )
+      )
+    )
+}
+
+
+# Public transport
+two_combined_15_pt <- create_priority_two_combined(
+  suhii_object = bilisa_15_pt_suhii,
+  imd_object = bilisa_15_pt_imd
+)
+
+# Walking
+two_combined_15_walk <- create_priority_two_combined(
+  suhii_object = bilisa_15_walk_suhii,
+  imd_object = bilisa_15_walk_imd
+)
+
+# Cycling
+two_combined_15_cycle <- create_priority_two_combined(
+  suhii_object = bilisa_15_cycle_suhii,
+  imd_object = bilisa_15_cycle_imd
+)
+```
+
+```{r}
+# Colours for the two_combined classification
+two_combined_colours <- c(
+  "High SUHII and IMD" = "#5F2022",
+  "High SUHII"         = "#AD423B",
+  "High IMD"           = "#DC9179",
+  "Not Significant"    = "#FBF8F2"
+)
+
+
+# Function to create one map with all combined
+create_two_combined_map <- function(data) {
+
+  tm_shape(data) +
+    tm_fill(
+      fill = "two_combined_class",
+      fill.scale = tm_scale_categorical(
+        values = two_combined_colours
+      ),
+      fill.legend = tm_legend_hide()
+    ) +
+
+    # Add Greater London boundary
+    tm_shape(london_boundary) +
+    tm_borders(
+      col = "grey30",
+      lwd = 1
+    ) +
+
+    tm_layout(
+      frame = FALSE,
+      bg.color = "white",
+      outer.margins = 0
+    )
+}
+
+
+# Create the three maps
+two_combined_15_pt_map <- create_two_combined_map(
+  two_combined_15_pt
+)
+
+two_combined_15_walk_map <- create_two_combined_map(
+  two_combined_15_walk
+)
+
+two_combined_15_cycle_map <- create_two_combined_map(
+  two_combined_15_cycle
+)
+
+
+# Convert tmap maps into grobs for cowplot
+two_combined_15_grobs <- list(
+  tmap::tmap_grob(two_combined_15_pt_map),
+  tmap::tmap_grob(two_combined_15_walk_map),
+  tmap::tmap_grob(two_combined_15_cycle_map)
+)
+
+
+# Combine the three maps
+two_combined_15_maps <- cowplot::plot_grid(
+  plotlist = two_combined_15_grobs,
+  ncol = 1,
+  labels = c("a", "b", "c"),
+  label_size = 12,
+  align = "v",
+  axis = "lr"
+)
+
+
+# Create a shared legend
+two_combined_legend_data <- data.frame(
+  two_combined_class = factor(
+    names(two_combined_colours),
+    levels = names(two_combined_colours)
+  ),
+  x = 1,
+  y = seq_along(two_combined_colours)
+)
+
+two_combined_legend_plot <- ggplot(
+  two_combined_legend_data,
+  aes(x = x, y = y, fill = two_combined_class)
+) +
+  geom_point(
+    shape = 22,
+    size = 8,
+    colour = NA
+  ) +
+  scale_fill_manual(
+    values = two_combined_colours,
+    breaks = names(two_combined_colours),
+    drop = FALSE,
+    name = "BiLISA Clusters"
+  ) +
+  guides(
+    fill = guide_legend(
+      override.aes = list(
+        shape = 22,
+        size = 8,
+        colour = NA
+      )
+    )
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(size = 11),
+    legend.text = element_text(size = 9),
+    legend.key.height = grid::unit(0.65, "cm"),
+    legend.key.width = grid::unit(0.65, "cm")
+  )
+
+
+shared_two_combined_legend <- cowplot::get_legend(
+  two_combined_legend_plot,
+  legend = "right"
+)
+
+
+# Add shared legend
+two_combined_15_final_body <- cowplot::plot_grid(
+  two_combined_15_maps,
+  shared_two_combined_legend,
+  ncol = 2,
+  rel_widths = c(0.76, 0.24)
+)
+
+
+# Add overall figure title
+two_combined_15_final <- cowplot::ggdraw() +
+  cowplot::draw_label(
+    paste0(
+      "15-minute BiLISA Clusters of\n",
+      "Low Accessibility–High SUHII and/or High IMD"
+    ),
+    x = 0.5,
+    y = 0.98,
+    hjust = 0.5,
+    fontface = "bold",
+    size = 14
+  ) +
+  cowplot::draw_plot(
+    two_combined_15_final_body,
+    x = 0,
+    y = 0,
+    width = 1,
+    height = 0.93
+  )
+
+
+# Display final figure
+two_combined_15_final
+```
+
+```{r}
+# save as PNG
+ggsave(
+  filename = "figures/Fig12_BiLISA_15_min_Combined.png",
+  plot = two_combined_15_final,
+  width = 9,
+  height = 11,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
+```
+
+```{r}
+# Create the combined classifications
+
+# Public transit
+two_combined_60_pt <- create_priority_two_combined(
+  suhii_object = bilisa_60_pt_suhii,
+  imd_object = bilisa_60_pt_imd
+)
+
+# Walking
+two_combined_60_walk <- create_priority_two_combined(
+  suhii_object = bilisa_60_walk_suhii,
+  imd_object = bilisa_60_walk_imd
+)
+
+# Cycling
+two_combined_60_cycle <- create_priority_two_combined(
+  suhii_object = bilisa_60_cycle_suhii,
+  imd_object = bilisa_60_cycle_imd
+)
+
+
+
+# Create  three maps 
+two_combined_60_pt_map <- create_two_combined_map(
+  two_combined_60_pt
+)
+
+two_combined_60_walk_map <- create_two_combined_map(
+  two_combined_60_walk
+)
+
+two_combined_60_cycle_map <- create_two_combined_map(
+  two_combined_60_cycle
+)
+
+
+# Convert tmap objects into grobs for cowplot 
+two_combined_60_grobs <- list(
+  tmap::tmap_grob(two_combined_60_pt_map),
+  tmap::tmap_grob(two_combined_60_walk_map),
+  tmap::tmap_grob(two_combined_60_cycle_map)
+)
+
+
+# Arrange vertically:
+# a = public transit
+# b = walking
+# c = cycling
+
+two_combined_60_maps <- cowplot::plot_grid(
+  plotlist = two_combined_60_grobs,
+  ncol = 1,
+  labels = c("a", "b", "c"),
+  label_size = 12,
+  align = "v",
+  axis = "lr"
+)
+
+
+# Add the same shared legend  
+two_combined_60_final_body <- cowplot::plot_grid(
+  two_combined_60_maps,
+  shared_two_combined_legend,
+  ncol = 2,
+  rel_widths = c(0.76, 0.24)
+)
+
+
+# Add the big title
+two_combined_60_final <- cowplot::ggdraw() +
+  cowplot::draw_label(
+    paste0(
+      "60-minute BiLISA Clusters of\n",
+      "Low Accessibility–High SUHII and/or High IMD"
+    ),
+    x = 0.5,
+    y = 0.98,
+    hjust = 0.5,
+    fontface = "bold",
+    size = 14
+  ) +
+  cowplot::draw_plot(
+    two_combined_60_final_body,
+    x = 0,
+    y = 0,
+    width = 1,
+    height = 0.93
+  )
+
+
+two_combined_60_final
+```
+
+```{r, eval=FALSE}
+# save as PNG
+ggsave(
+  filename = "figures/Fig14_BiLISA_60_min_LH_Combined.png",
+  plot = two_combined_60_final,
+  width = 9,
+  height = 11,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
+```
+
+### 9.4. Summary of overlap L-H clusters of High SUHII and IMD
+
+```{r}
+# Put all six overlap objects into a named list
+overlap_objects <- list(
+  "15-minute Public Transit" = two_combined_15_pt,
+  "15-minute Walking"          = two_combined_15_walk,
+  "15-minute Cycling"          = two_combined_15_cycle,
+  "60-minute Public Transit" = two_combined_60_pt,
+  "60-minute Walking"          = two_combined_60_walk,
+  "60-minute Cycling"          = two_combined_60_cycle
+)
+
+# Calculate number and percentage of London LSOAs
+# that are Low-High for BOTH SUHII and IMD
+overlap_summary <- dplyr::bind_rows(
+  
+  lapply(names(overlap_objects), function(x) {
+    
+    data <- overlap_objects[[x]] %>%
+      sf::st_drop_geometry()
+    
+    tibble::tibble(
+      Accessibility = x,
+      
+      overlap_n = sum(
+        data$two_combined_class == "High SUHII and IMD",
+        na.rm = TRUE
+      ),
+      
+      total_lsoas = nrow(data),
+      
+      overlap_percentage = 
+        overlap_n / total_lsoas * 100
+    )
+    
+  })
+)
+
+overlap_summary
+```

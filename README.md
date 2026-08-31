@@ -3,7 +3,7 @@
 ## Overview
 This repository contains the code used for the dissertation submitted in part requirement for the MSc in the Centre for Advanced Spatial Analysis, Bartlett Faculty of the Built Environment, UCL. 
 
-This study sets out to answer the following question: *To what extent is multimodal accessibility to cooling-effective urban green spaces equitably distributed across heat exposed and socioeconomically disadvantaged areas in London?* The following sections describes the full reproducible workflow from data preparation, quantification of urban heat and park cooling, multimodal accessibility modelling, and statistical and spatial analyses to assess equity. 
+This study sets out to answer the following question: *To what extent is multimodal accessibility to cooling-effective urban green spaces equitably distributed across heat exposed and socioeconomically disadvantaged areas in London?* The following sections describe the reproducible workflow from data preparation, quantification of urban heat and park cooling, multimodal accessibility modelling, and statistical and spatial analyses to assess equity. 
 
 ## Repository Structure
 ```
@@ -15,12 +15,12 @@ london-cooling-access-equity/
 ├── 3_GoogleEarthEngine_Greenspace_Buffer_LST             
 ├── 4_Quantify_Park_Cooling.Rmd                           
 ├── 5_Multimodal_Accessibility_r5r.Rmd                   
-├── 5a_Map_Travel_Time_Cummulative_Accessibility.Rmd      
+├── 5a_Map_Travel_Time_Cumulative_Accessibility.Rmd      
 ├── 6_Statistical_Analyses.Rmd                            
-├── Adobe_Illustrator_Buffer_Schematic_Diagram.ai         # Adobe Illustrator file for green space buffer schematic visualisation
-├── code_draft                                            # Code script drafts
-├── data/                                                 # Data used for this study, full project data available to download below under Data Availability
-└── figures/                                              # Figures presented in the dissertation document
+├── Adobe_Illustrator_Buffer_Schematic_Diagram.ai             # Adobe Illustrator file for green space buffer schematic visualisation
+├── code_draft/                                               # Code script drafts
+├── data/                                                     # Data used for this study, full project data available to download below under Data Availability
+└── figures/                                                  # Figures presented in the dissertation document
 ```
 
 ## Reproducibility
@@ -28,23 +28,27 @@ london-cooling-access-equity/
 The code scripts are structured in the order in which the analysis was performed. Note: `2_GoogleEarthEngine_LST_Quantify_Urban_Heat.txt` and `3_GoogleEarthEngine_Greenspace_Buffer_LST.txt` are to be processed via the [Google Earth Engine Code Editor](https://code.earthengine.google.com/)
 
 ### 1. Data Preparation
-`1_Data_Preparation.Rmd` pre-process and filter datasets to the Greater London study area, and `1a_Map_Study_Area.Rmd` visualises the study area map and spatial context. 
+`1_Data_Preparation.Rmd` pre-processes and filter datasets to the Greater London study area, including conversion of GTFS data using `UK2GTFS`. The study area is visualised in `1a_Map_Study_Area.Rmd`. 
 
 ### 2. Land Surface Temperature (LST) and Quantify Urban Heat
-`2_GoogleEarthEngine_LST_Quantify_Urban_Heat.txt` is a Google Earth Engine script that retrieves Landsat-9 LST data. It also calculates London-level and LSOA-level LST, deriving surface urban heat intensity to quantify urban heat exposure.The corresponding visualisations are in `2a_Map_LST_Quantify_Urban_Heat.Rmd`
+`2_GoogleEarthEngine_LST_Quantify_Urban_Heat.txt` processes Landsat-9 LST data, derives London-level and LSOA-level LST and surface urban heat intensity to quantify urban heat exposure. The corresponding visualisations are in `2a_Map_LST_and_SUHII.Rmd`
 
 
 ### 3. Urban Green Space and Buffer LST 
-`3_GoogleEarthEngine_Greenspace_Buffer_LST.txt` is a Google Earth Engine script that retrieves Landsat-9 LST data for urban green spaces and surrounding buffer rings for park cooling analysis.
+`3_GoogleEarthEngine_Greenspace_Buffer_LST.txt` retrieves Landsat-9 LST data for urban green spaces and surrounding 30m - 900m buffer rings for park cooling analysis.
 
 ### 4. Quantify Park Cooling
-`4_Quantify_Park_Cooling.Rmd` calculates park cooling indicators and identifies cooling-effective urban green spaces.
+`4_Quantify_Park_Cooling.Rmd` derives park cooling indicators and identifies cooling-effective urban green spaces.
 
 ### 5. Multimodal Accessibility
-`5_Multimodal_Accessibility_r5r.Rmd` computes multimodal travel time matrices and accessibility indicators to cooling-effective urban green spaces using `r5r`, the corresponding visualisations are in `5a_Map_Travel_Time_Cumulative_Accessibility.Rmd`.
+`5_Multimodal_Accessibility_r5r.Rmd` computes multimodal travel time matrices and accessibility indicators to cooling-effective urban green spaces using `r5r`, with corresponding visualisations in `5a_Map_Travel_Time_Cumulative_Accessibility.Rmd`.
 
 ### 6. Statistical Analyses
-`6_Statistical_Analyses.Rmd` performs statistical analyses for this study, including regression, spatial regression modelling and local indicators of spatial association analyses to assess accessibility equity. 
+`6_Statistical_Analyses.Rmd` performs statistical analyses for this study, including GLM regression, BYM2 spatial regression modelling and BiLISA analysis to assess equity. 
+
+
+## Software Requirements
+The analysis was performed using R and Google Earth Engine. Key R-packages used in the analysis include `sf`, `dplyr`, `r5r`, `spdep`, `INLA` and `MASS`.
 
 
 ## Data Availability
@@ -56,37 +60,37 @@ or obtained directly from the below [Data Sources](https://github.com/christycho
 
 ```
 data/
-├── raw_data/                                             # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 
-├── gla/                                                  # Greater London boundary shapefile 
-├── lsoa_london/                                          # LSOA boundary shapefile filtered to London only 
-├── London_LSOA_LST_SUHI/                                 # LST and SUHII data retrieved from Google Earth Engine 
-├── London_LST_median.tif                                 # Median LST raster data for Greater London retreived from Google Earth Engine
-├── greenspace_london_2ha/                                # Greenspace polygons shapefile filtered to >2ha and London only 
-├── greenspace_buffer_LST/                                # Green space LST and Green space Buffer LST (30m, 0-900m) retreived from Google Earth Engine
-├── cooling_effective_UGS/                                # Cooling-effective UGS shapefile
-├── london_lsoa_pop_weighted_centroids/                   # Population weighted centroids for LSOAs
-├── origins_destinations/                                 # Origins and Destinations for r5r routing
-├── r5r/                                                  # Data folder for r5r 
-|   ├── greater-london-260414.osm.pbf                     # Road network data
-|   ├── gtfs_rail.zip                                     # Rail GTFS data
-|   └── itm_london_gtfs.zip                               # Bus GTFS data
-├── r5r_TTM/                                              # r5r raw travel time matrices
-|   ├── r5r_TTM_PT_raw.rds                                # r5r computed Public Transit raw travel time matrices
-|   ├── r5r_TTM_walk_raw.rds                              # r5r computed Walking raw travel time matrices
-|   └── r5r_TTM_cycle_raw.rds                             # r5r computed Cycling raw travel time matrices
-├── multimodal_accessibility_lsoa.gpkg                    # Minimum travel time and cummulative accessibility scores
-├── census2021/                                           # Census 2021 raw dataset for population density, age, ethnic groups 
-├── IMD_2025.csv                                          # IMD 2025 scores raw dataset
-└── map.graph                                             # Adjacency graph for Bayesian BYM2 spatial regression model
+├── raw_data/                                                 # Raw data for filtering data sets to London study area only for preprocessing in Google Earth Engine 
+├── gla/                                                      # Greater London boundary shapefile 
+├── lsoa_london/                                              # LSOA boundary shapefile filtered to London only 
+├── London_LSOA_LST_SUHI/                                     # LST and SUHII data retrieved from Google Earth Engine 
+├── London_LST_median.tif                                     # Median LST raster data for Greater London retrieved from Google Earth Engine
+├── greenspace_london_2ha/                                    # Greenspace polygons shapefile filtered to >2ha and London only 
+├── greenspace_buffer_LST/                                    # Green space LST and Green space Buffer LST (30m, 0-900m) retrieved from Google Earth Engine
+├── cooling_effective_UGS/                                    # Cooling-effective UGS shapefile
+├── london_lsoa_pop_weighted_centroids/                       # Population weighted centroids for LSOAs
+├── origins_destinations/                                     # Origins and Destinations for r5r routing
+├── r5r/                                                      # Data folder for r5r 
+|   ├── greater-london-260414.osm.pbf                         # Road network data
+|   ├── gtfs_rail.zip                                         # Rail GTFS data
+|   └── itm_london_gtfs.zip                                   # Bus GTFS data
+├── r5r_TTM/                                                  # r5r raw travel time matrices
+|   ├── r5r_TTM_PT_raw.rds                                    # r5r computed Public Transit raw travel time matrices
+|   ├── r5r_TTM_walk_raw.rds                                  # r5r computed Walking raw travel time matrices
+|   └── r5r_TTM_cycle_raw.rds                                 # r5r computed Cycling raw travel time matrices
+├── multimodal_accessibility_lsoa.gpkg                        # Minimum travel time and cumulative accessibility scores
+├── census2021/                                               # Census 2021 raw dataset for population density, age, ethnic groups 
+├── File_7_IoD2025.csv                                        # IMD 2025 scores raw dataset
+└── map.graph                                                 # Adjacency graph for Bayesian BYM2 spatial regression model
 ```
 
 ### Data Sources
-Original sources of data used to produce this study are listed as below: 
+Original sources of data used to produce this study are listed below: 
 |Dataset|Reference|
 |---|---|
 |Greater London Boundary|[Greater London Authority (2018)](https://data.london.gov.uk/dataset/statistical-gis-boundary-files-for-london-20od9/)|
 |Lower layer Super Output Areas (December 2021) EW|[Office for National Statistics (2024)](https://geoportal.statistics.gov.uk/datasets/2bbaef5230694f3abae4f9145a3a9800_0/explore?location=52.837550%2C-2.489483%2C6)|
-|Landsat 8/9 Collection 2 Level 2|[Earth Resources Observation and Science (EROS) Center. (2020)](https://developers.google.com/earth-engine/datasets/catalog/LANDSAT_LC08_C02_T1_L2)|
+|Landsat 9 Collection 2 Level 2|[Earth Resources Observation and Science (EROS) Center. (2020)](https://developers.google.com/earth-engine/datasets/catalog/LANDSAT_LC08_C02_T1_L2)|
 |OS Open Greenspace|[Ordnance Survey (2026)](https://www.ordnancesurvey.co.uk/products/os-open-greenspace)|
 |OpenStreetMap, Greater London|[Geofabrik and OSM Contributors (2025)](https://download.geofabrik.de/europe/united-kingdom/england/greater-london.html)|
 |Bus Open Data Service|[Department for Transport (2026)](https://data.bus-data.dft.gov.uk/timetable/download/)|

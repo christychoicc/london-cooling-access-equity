@@ -76,6 +76,10 @@ london_lsoa_study_area_map <- ggplot() +
     fill = "#A8C3A0",   # muted green
     colour = NA
   ) +
+    coord_sf(
+    datum = NA,
+    expand = FALSE
+  ) +
   theme_void()
 
 london_lsoa_study_area_map
