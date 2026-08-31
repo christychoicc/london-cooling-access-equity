@@ -18,7 +18,6 @@ gc()
 
 ```{r}
 library(sf)
-library(sp)
 library(readr)
 library(dplyr)
 library(knitr)
@@ -30,17 +29,12 @@ library(cowplot)
 library(plotly)
 library(corrplot)
 library(broom)
-library(mapview)
 library(stringr)
 library(spdep)
 library(car)
-library(fs)
 library(janitor)
-library(GGally)
 library(MASS)
-library(spatialreg)
 library(INLA)
-library(INLAtools)
 library(performance)
 ```
 
@@ -508,7 +502,7 @@ To model geographic variation in count data, use poisson or negative binomial mo
 
 ## 5. GLM
 
-### 5.1. Negative Binomial 
+### 5.1. Negative Binomial
 
 ```{r}
 # independent variables to be the same for every model
@@ -552,7 +546,7 @@ for (nm in names(models_nb)) {
 }
 ```
 
-### 5.2. Poisson 
+### 5.2. Poisson
 
 ```{r}
 # independent variables to be the same for every model
@@ -668,7 +662,7 @@ LLSOA.knn_4_weight <- LLSOA_knn %>%
   nb2listw(., style="W")
 ```
 
-#### 5.3.1.  Models VIF and Residuals
+#### 5.3.1. Models VIF and Residuals
 
 ```{r}
 # name the models
@@ -826,15 +820,6 @@ align = c("l", "c", "c", "c", "c"),
 caption = "Moran's I tests of GLM residual spatial autocorrelation"
 )
 ```
-
-| Model          | Family            | Moran's I (Queens) | Moran's I (knn) |
-|----------------|-------------------|--------------------|-----------------|
-| model_15_pt    | Poisson           | 0.5119248          | 0.5322355       |
-| model_60_pt    | Negative Binomial | 0.6729391          | 0.6872948       |
-| model_15_walk  | Poisson           | 0.6667913          | 0.6918659       |
-| model_60_walk  | Negative Binomial | 0.9055903          | 0.9090586       |
-| model_15_cycle | Negative Binomial | 0.7601062          | 0.7765267       |
-| model_60_cycle | Negative Binomial | 0.9209963          | 0.9120826       |
 
 Strong positive spatial autocorrelation for queens case and nearest neighbours by Moran's I for all models, so next use spatial models
 

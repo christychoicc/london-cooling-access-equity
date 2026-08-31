@@ -75,7 +75,7 @@ data/greenspace_london_2ha*
 # London LSOA population weighted centroids
 data/london_lsoa_pop_weighted_centroids*
 # IMD score 2025
-data/File_7_IoD2025_All_Ranks_Scores_Deciles_Population_Denominators.csv*
+data/File_7_IoD2025.csv*
 # census 2021
 data/census2021
 
