@@ -3,7 +3,7 @@
 ## Overview
 This repository contains the code used for the dissertation submitted in part requirement for the MSc in the Centre for Advanced Spatial Analysis, Bartlett Faculty of the Built Environment, UCL. 
 
-This study sets out to answer the following question: *To what extent is multimodal accessibility to cooling-effective urban green spaces equitably distributed across heat exposed and socioeconomically disadvantaged areas in London?* The following sections describe the reproducible workflow from data preparation, quantification of urban heat and park cooling, multimodal accessibility modelling, and statistical and spatial analyses to assess equity. 
+This study sets out to answer the following question: *To what extent is multimodal accessibility to cooling-effective urban green spaces equitably distributed across heat exposed and socioeconomically deprived areas in London?* The following sections describe the reproducible workflow from data preparation, quantification of urban heat and park cooling, multimodal accessibility modelling, and statistical and spatial analyses to assess equity. 
 
 ## Repository Structure
 ```
